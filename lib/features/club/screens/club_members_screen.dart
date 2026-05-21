@@ -27,7 +27,8 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
       if (await canLaunchUrl(launchUri)) {
         await launchUrl(launchUri);
       } else {
-        throw 'Could not launch $launchUri';
+        // Fallback: Attempt direct launch if pre-flight check fails (common on emulators/custom ROMs)
+        await launchUrl(launchUri);
       }
     } catch (e) {
       if (mounted) {
@@ -47,7 +48,8 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
       if (await canLaunchUrl(launchUri)) {
         await launchUrl(launchUri);
       } else {
-        throw 'Could not launch $launchUri';
+        // Fallback: Attempt direct launch if pre-flight check fails (common on emulators/custom ROMs)
+        await launchUrl(launchUri);
       }
     } catch (e) {
       if (mounted) {

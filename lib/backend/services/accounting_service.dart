@@ -217,7 +217,7 @@ class AccountingService {
           firstName: data['first_name'] ?? '',
           lastName: data['last_name'] ?? '',
           name: '${data['first_name']} ${data['last_name']}',
-          email: '', 
+          email: data['email'] ?? '', 
           universityId: data['university_id'] ?? '',
           classRoll: data['class_roll'] ?? '',
           duRegNo: data['du_reg'] ?? '',
