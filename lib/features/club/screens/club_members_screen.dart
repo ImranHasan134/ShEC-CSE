@@ -18,43 +18,225 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
   bool _isLoading = true;
   String? _copiedValue;
 
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
+  Future<void> _confirmAndMakeCall(ProfileData member) async {
+    final colors = Theme.of(context).colorScheme;
+    final phone = member.phone;
+    if (phone.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: colors.surface,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.teal.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.phone_forwarded, color: Colors.teal),
+            ),
+            const SizedBox(width: 12),
+            const Text('Confirm Phone Call', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'Would you like to call ${member.name}?\n\nPhone: $phone',
+          style: TextStyle(color: colors.onSurface, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: colors.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Call'),
+          ),
+        ],
+      ),
     );
-    try {
-      if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-      } else {
-        // Fallback: Attempt direct launch if pre-flight check fails (common on emulators/custom ROMs)
-        await launchUrl(launchUri);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start phone call: $e')),
+
+    if (confirm == true) {
+      await HapticFeedback.lightImpact();
+      final Uri launchUri = Uri(scheme: 'tel', path: phone);
+      try {
+        bool launched = await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+        if (!launched) {
+          throw 'App launch returned false';
+        }
+      } catch (e) {
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            backgroundColor: colors.surface,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colors.error.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.error_outline, color: colors.error),
+                ),
+                const SizedBox(width: 12),
+                const Text('Could Not Open Dialer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: Text(
+              'No phone dialer app could be opened automatically on this device. This is common on simulators or devices without mobile network hardware.\n\nPhone Number: $phone',
+              style: TextStyle(color: colors.onSurface, fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Dismiss', style: TextStyle(color: colors.onSurfaceVariant)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: phone));
+                  Navigator.pop(context);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Phone number copied to clipboard!'),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Copy Number'),
+              ),
+            ],
+          ),
         );
       }
     }
   }
 
-  Future<void> _sendEmail(String emailAddress) async {
-    final Uri launchUri = Uri(
-      scheme: 'mailto',
-      path: emailAddress,
+  Future<void> _confirmAndSendEmail(ProfileData member) async {
+    final colors = Theme.of(context).colorScheme;
+    final email = member.email;
+    if (email.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: colors.surface,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.mail_outline, color: Colors.blue),
+            ),
+            const SizedBox(width: 12),
+            const Text('Confirm Email', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'Would you like to send an email to ${member.name}?\n\nEmail: $email',
+          style: TextStyle(color: colors.onSurface, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: colors.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Email'),
+          ),
+        ],
+      ),
     );
-    try {
-      if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-      } else {
-        // Fallback: Attempt direct launch if pre-flight check fails (common on emulators/custom ROMs)
-        await launchUrl(launchUri);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not send email: $e')),
+
+    if (confirm == true) {
+      await HapticFeedback.lightImpact();
+      final Uri launchUri = Uri(scheme: 'mailto', path: email);
+      try {
+        bool launched = await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+        if (!launched) {
+          throw 'App launch returned false';
+        }
+      } catch (e) {
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            backgroundColor: colors.surface,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colors.error.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.error_outline, color: colors.error),
+                ),
+                const SizedBox(width: 12),
+                const Text('Could Not Open Mail App', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: Text(
+              'No default email application could be opened on this device. This is common if no email accounts are set up or if no mail client is installed.\n\nEmail: $email',
+              style: TextStyle(color: colors.onSurface, fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Dismiss', style: TextStyle(color: colors.onSurfaceVariant)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: email));
+                  Navigator.pop(context);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Email address copied to clipboard!'),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Copy Email'),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -148,8 +330,21 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
                 _buildModernInfoRow(Icons.badge_outlined, 'Student ID', member.studentFullId),
                 _buildModernInfoRow(Icons.school_outlined, 'Session', member.session),
                 _buildModernInfoRow(Icons.numbers_outlined, 'DU Reg', member.duRegNo),
-                _buildModernInfoRow(Icons.phone_outlined, 'Phone', member.phone, isCopyable: true, onActionTap: member.phone.isNotEmpty ? () => _makePhoneCall(member.phone) : null, actionIcon: Icons.phone_forwarded),
-                _buildModernInfoRow(Icons.email_outlined, 'Email', member.email, isCopyable: true, onActionTap: member.email.isNotEmpty ? () => _sendEmail(member.email) : null, actionIcon: Icons.mail_outline),
+                const SizedBox(height: 8),
+                _buildElevatedContactCard(
+                  icon: Icons.phone_outlined,
+                  label: 'Phone',
+                  value: member.phone,
+                  accentColor: Colors.teal,
+                  onActionTap: member.phone.isNotEmpty ? () => _confirmAndMakeCall(member) : null,
+                ),
+                _buildElevatedContactCard(
+                  icon: Icons.email_outlined,
+                  label: 'Email',
+                  value: member.email,
+                  accentColor: Colors.blue,
+                  onActionTap: member.email.isNotEmpty ? () => _confirmAndSendEmail(member) : null,
+                ),
                 
                 if (canManage && member.id != currentProfile.value.id) ...[
                   const SizedBox(height: 32),
@@ -373,6 +568,156 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
     );
   }
 
+  Widget _buildElevatedContactCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color accentColor,
+    required VoidCallback? onActionTap,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCopied = _copiedValue == value;
+
+    if (value.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.black.withOpacity(0.3) : accentColor.withOpacity(0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        child: Material(
+          color: isDark ? colors.surfaceContainerLow : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onActionTap,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark 
+                      ? accentColor.withOpacity(0.2) 
+                      : accentColor.withOpacity(0.15),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(icon, size: 26, color: accentColor),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1.2,
+                            color: isDark ? colors.onSurfaceVariant.withOpacity(0.8) : colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          value,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : colors.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: accentColor.withOpacity(0.15), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label == 'Phone' ? 'Call' : 'Mail',
+                          style: TextStyle(
+                            color: accentColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          label == 'Phone' ? Icons.phone_forwarded : Icons.alternate_email,
+                          size: 14,
+                          color: accentColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: value));
+                      setState(() => _copiedValue = value);
+                      Future.delayed(const Duration(seconds: 2), () {
+                        if (mounted) setState(() => _copiedValue = null);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('$label copied!'),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          duration: const Duration(seconds: 1),
+                          width: 220,
+                        ),
+                      );
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isCopied ? Colors.green.withOpacity(0.1) : colors.onSurface.withOpacity(0.05),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isCopied ? Icons.check : Icons.copy_rounded,
+                        size: 16,
+                        color: isCopied ? Colors.green : colors.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<bool?> _showConfirmDialog(String title, String content) {
     return showDialog<bool>(
       context: context,
@@ -582,11 +927,10 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    final tabLabelColor = isDark ? colors.primary : Colors.white;
-    final tabUnselectedColor = isDark ? colors.onSurface.withOpacity(0.6) : Colors.white.withOpacity(0.7);
-    final tabIndicatorColor = isDark ? colors.primary : Colors.white;
+    final tabLabelColor = colors.primary;
+    final tabUnselectedColor = colors.onSurface.withOpacity(0.6);
+    final tabIndicatorColor = colors.primary;
 
     final filteredAll = _allMembers.where((m) => 
       m.name.toLowerCase().contains(_searchQuery.toLowerCase()) || 
@@ -709,7 +1053,61 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
                 ],
               ],
             ),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (member.phone.isNotEmpty) ...[
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _confirmAndMakeCall(member),
+                      borderRadius: BorderRadius.circular(30),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.teal.withOpacity(0.2), width: 1),
+                        ),
+                        child: const Icon(
+                          Icons.phone,
+                          size: 18,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (member.email.isNotEmpty) ...[
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _confirmAndSendEmail(member),
+                      borderRadius: BorderRadius.circular(30),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.blue.withOpacity(0.2), width: 1),
+                        ),
+                        child: const Icon(
+                          Icons.email_outlined,
+                          size: 18,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Icon(
+                  Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                ),
+              ],
+            ),
           ),
         );
       },

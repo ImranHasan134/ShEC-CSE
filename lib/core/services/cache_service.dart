@@ -44,4 +44,5 @@ class CacheKeys {
   static const String exams = 'exams';
   static const String sessions = 'sessions';
   static const String resources = 'resources';
+  static const String contributors = 'contributors';
 }

@@ -114,9 +114,17 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
           },
           child: Scaffold(
             appBar: AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () => controller.toggle(),
+              leading: ListenableBuilder(
+                listenable: UpdateService.instance,
+                builder: (context, _) {
+                  return Badge(
+                    isLabelVisible: UpdateService.instance.hasUpdate,
+                    child: IconButton(
+                      icon: const Icon(Icons.menu),
+                      onPressed: () => controller.toggle(),
+                    ),
+                  );
+                },
               ),
               title: Row(
                 mainAxisSize: MainAxisSize.min,
