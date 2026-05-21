@@ -26,9 +26,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final PageController _pageController = PageController(viewportFraction: 0.85);
+  final PageController _pageController = PageController(
+    initialPage: 10080,
+    viewportFraction: 0.85,
+  );
+  int _currentPage = 10080;
   Timer? _carouselTimer;
-  int _currentPage = 0;
 
   @override
   void initState() {
@@ -48,13 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _startCarouselTimer() {
     _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
-      if (_pageController.hasClients && galleryState.value.where((item) => item.isApproved).isNotEmpty) {
-        final itemCount = galleryState.value.where((item) => item.isApproved).length;
-        if (_currentPage < itemCount - 1) {
-          _currentPage++;
-        } else {
-          _currentPage = 0;
-        }
+      final approvedCount = galleryState.value.where((item) => item.isApproved).length;
+      if (_pageController.hasClients && approvedCount > 0) {
+        _currentPage++;
         _pageController.animateToPage(
           _currentPage,
           duration: const Duration(milliseconds: 800),
@@ -106,14 +105,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   height: 200,
                   child: PageView.builder(
                     controller: _pageController,
-                    onPageChanged: (int page) {
-                      setState(() {
-                        _currentPage = page;
-                      });
+                    onPageChanged: (page) {
+                      _currentPage = page;
                     },
-                    itemCount: approvedItems.length,
+                    itemCount: 1000000, // Pseudo-infinite scroll space
                     itemBuilder: (context, index) {
-                      return _buildCarouselItem(approvedItems[index], index);
+                      final itemIndex = index % approvedItems.length;
+                      return _buildCarouselItem(approvedItems[itemIndex], index);
                     },
                   ),
                 ),
