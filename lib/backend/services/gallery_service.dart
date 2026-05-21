@@ -72,9 +72,15 @@ class GalleryService {
 
   static Future<void> deleteGalleryItemFromDB(GalleryItem item) async {
     try {
-      // 1. Delete image from storage
-      if (item.imagePath.isNotEmpty) {
-        await StorageService.deleteFile(item.imagePath);
+      // 1. Delete all images from storage
+      for (final path in item.imagePaths) {
+        if (path.isNotEmpty) {
+          try {
+            await StorageService.deleteFile(path);
+          } catch (e) {
+            debugPrint('Failed to delete file from storage: $path. Error: $e');
+          }
+        }
       }
 
       // 2. Delete from DB

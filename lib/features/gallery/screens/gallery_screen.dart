@@ -28,8 +28,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
     bool isVisible = existingItem?.isVisible ?? true;
     final formKey = GlobalKey<FormState>();
 
-    File? selectedImage;
-    String? currentImageUrl = existingItem?.imagePath.isNotEmpty == true ? existingItem!.imagePath : null;
+    final List<dynamic> mediaList = [];
+    if (existingItem != null) {
+      if (existingItem.imagePaths.isNotEmpty) {
+        mediaList.addAll(existingItem.imagePaths);
+      } else if (existingItem.imagePath.isNotEmpty) {
+        mediaList.add(existingItem.imagePath);
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -39,8 +45,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             bool isUploading = false;
+            String uploadingStatus = '';
 
             Future<void> pickImage() async {
+              if (mediaList.length >= 5) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('You can upload up to 5 images.'))
+                );
+                return;
+              }
               final picker = ImagePicker();
               final pickedFile = await picker.pickImage(source: ImageSource.gallery);
               if (pickedFile != null) {
@@ -56,7 +69,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   // 2. Compress and Convert to WebP
                   final processed = await ImageProcessingService.processAndConvert(cropped);
                   if (processed != null) {
-                    setModalState(() => selectedImage = processed);
+                    setModalState(() => mediaList.add(processed));
                   }
                 }
               }
@@ -100,119 +113,188 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       ),
                       const SizedBox(height: 8),
   
-                      const Text('Photo *', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      if (selectedImage != null) ...[
-                        Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(selectedImage!, height: 160, width: double.infinity, fit: BoxFit.cover),
-                            ),
-                            Positioned(
-                              top: 6, right: 6,
-                              child: IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white),
-                                style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                                onPressed: () => setModalState(() => selectedImage = null),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else if (currentImageUrl != null) ...[
-                        Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(currentImageUrl!, height: 160, width: double.infinity, fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(height: 160, color: Colors.grey.shade200, child: const Icon(Icons.broken_image, size: 48))),
-                            ),
-                            Positioned(
-                              top: 6, right: 6,
-                              child: IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white),
-                                style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                                onPressed: () => setModalState(() => currentImageUrl = null),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        GestureDetector(
-                          onTap: pickImage,
-                          child: Container(
-                            height: 120,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
-                              borderRadius: BorderRadius.circular(10),
-                              color: Colors.grey.shade50,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate_outlined, size: 40, color: Colors.grey.shade500),
-                                const SizedBox(height: 8),
-                                Text('Tap to select image', style: TextStyle(color: Colors.grey.shade600)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (selectedImage != null || currentImageUrl != null) ...[
-                        const SizedBox(height: 8),
-                        TextButton.icon(
-                          onPressed: pickImage,
-                          icon: const Icon(Icons.swap_horiz),
-                          label: const Text('Change Image'),
-                        ),
-                      ],
-  
-                      const SizedBox(height: 24),
+                      const Text('Photos (Up to 5) *', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
                       SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isUploading ? null : () async {
-                            if (!formKey.currentState!.validate()) return;
-                            if (selectedImage == null && (currentImageUrl == null || currentImageUrl!.isEmpty)) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an image')));
-                              return;
+                        height: 120,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: mediaList.length + (mediaList.length < 5 ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == mediaList.length) {
+                              return GestureDetector(
+                                onTap: pickImage,
+                                child: Container(
+                                  width: 120,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.grey.shade50,
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.grey.shade500),
+                                      const SizedBox(height: 4),
+                                      Text('Add Photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500)),
+                                    ],
+                                  ),
+                                ),
+                              );
                             }
-  
-                            setModalState(() => isUploading = true);
-                            String? finalImageUrl = currentImageUrl;
-                            if (selectedImage != null) {
-                              finalImageUrl = await GalleryService.uploadImage(selectedImage!);
-                            }
-  
-                            if (!context.mounted) return;
-                            if (finalImageUrl == null || finalImageUrl.isEmpty) {
-                              setModalState(() => isUploading = false);
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image upload failed. Try again.')));
-                              return;
-                            }
-  
-                            Navigator.pop(modalContext);
-                            final item = GalleryItem(
-                              id: existingItem?.id ?? '',
-                              title: titleController.text.trim(),
-                              description: descriptionController.text.trim(),
-                              imagePath: finalImageUrl,
-                              isVisible: isVisible,
-                              createdByName: existingItem?.createdByName ?? currentProfile.value.name,
+
+                            final item = mediaList[index];
+                            final isLocal = item is File;
+
+                            return Container(
+                              width: 120,
+                              margin: const EdgeInsets.only(right: 12),
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: isLocal
+                                        ? Image.file(item, height: 120, width: 120, fit: BoxFit.cover)
+                                        : Image.network(
+                                            item,
+                                            height: 120,
+                                            width: 120,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Container(
+                                              height: 120,
+                                              width: 120,
+                                              color: Colors.grey.shade200,
+                                              child: const Icon(Icons.broken_image, size: 32),
+                                            ),
+                                          ),
+                                  ),
+                                  if (isLocal)
+                                    Positioned(
+                                      bottom: 6,
+                                      left: 6,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.teal.withValues(alpha: 0.85),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text('NEW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setModalState(() {
+                                          mediaList.removeAt(index);
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             );
-  
-                            if (existingItem == null) {
-                              await GalleryService.addGalleryItemToDB(item);
-                            } else {
-                              await GalleryService.updateGalleryItemInDB(item);
-                            }
                           },
-                          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                          child: isUploading
-                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : Text(existingItem == null ? 'Create Gallery Item' : 'Update'),
                         ),
                       ),
+  
+                      const SizedBox(height: 24),
+                      if (isUploading) ...[
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(strokeWidth: 3),
+                              const SizedBox(height: 12),
+                              Text(
+                                uploadingStatus,
+                                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ] else
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              if (!formKey.currentState!.validate()) return;
+                              if (mediaList.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least one image')));
+                                return;
+                              }
+    
+                              setModalState(() {
+                                isUploading = true;
+                                uploadingStatus = 'Optimizing and uploading assets...';
+                              });
+
+                              final List<String> finalUrls = [];
+                              
+                              try {
+                                for (int i = 0; i < mediaList.length; i++) {
+                                  final media = mediaList[i];
+                                  if (media is File) {
+                                    setModalState(() {
+                                      uploadingStatus = 'Uploading photo ${i + 1} of ${mediaList.length}...';
+                                    });
+                                    final url = await GalleryService.uploadImage(media);
+                                    if (url != null && url.isNotEmpty) {
+                                      finalUrls.add(url);
+                                    } else {
+                                      throw Exception('Image upload failed');
+                                    }
+                                  } else if (media is String) {
+                                    finalUrls.add(media);
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  setModalState(() => isUploading = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+                                }
+                                return;
+                              }
+    
+                              if (!context.mounted) return;
+                              if (finalUrls.isEmpty) {
+                                setModalState(() => isUploading = false);
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Asset uploads failed. Try again.')));
+                                return;
+                              }
+    
+                              Navigator.pop(modalContext);
+                              final item = GalleryItem(
+                                id: existingItem?.id ?? '',
+                                title: titleController.text.trim(),
+                                description: descriptionController.text.trim(),
+                                imagePath: finalUrls.first,
+                                imagePaths: finalUrls,
+                                isVisible: isVisible,
+                                createdByName: existingItem?.createdByName ?? currentProfile.value.name,
+                              );
+    
+                              if (existingItem == null) {
+                                await GalleryService.addGalleryItemToDB(item);
+                              } else {
+                                await GalleryService.updateGalleryItemInDB(item);
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                            child: Text(existingItem == null ? 'Create Gallery Item' : 'Update'),
+                          ),
+                        ),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -379,13 +461,37 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ],
             ),
           ),
+          if (item.imagePaths.length > 1)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.photo_library_outlined, color: Colors.white, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${item.imagePaths.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (isAdmin)
             Positioned(
               top: 8, right: 8,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
                 ),
