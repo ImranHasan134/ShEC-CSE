@@ -19,6 +19,7 @@ import 'package:ShEC_CSE/features/results/presentation/bloc/result_bloc.dart';
 import 'package:ShEC_CSE/features/results/presentation/bloc/result_event.dart';
 import 'package:ShEC_CSE/features/messenger/presentation/bloc/chat_bloc.dart';
 import 'package:ShEC_CSE/features/messenger/presentation/bloc/chat_event.dart';
+import 'package:ShEC_CSE/features/accounting/presentation/bloc/accounting_bloc.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -63,6 +64,9 @@ Future<void> main() async {
         ),
         BlocProvider<ChatBloc>(
           create: (context) => ChatBloc()..add(FetchRoomsRequested()),
+        ),
+        BlocProvider<AccountingBloc>(
+          create: (context) => AccountingBloc(),
         ),
       ],
       child: ShEcCseApp(isLoggedIn: isLoggedIn),
