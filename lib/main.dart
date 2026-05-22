@@ -20,6 +20,32 @@ import 'package:ShEC_CSE/features/results/presentation/bloc/result_event.dart';
 import 'package:ShEC_CSE/features/messenger/presentation/bloc/chat_bloc.dart';
 import 'package:ShEC_CSE/features/messenger/presentation/bloc/chat_event.dart';
 import 'package:ShEC_CSE/features/accounting/presentation/bloc/accounting_bloc.dart';
+import 'package:ShEC_CSE/features/gallery/presentation/bloc/gallery_bloc.dart';
+import 'package:ShEC_CSE/features/gallery/presentation/bloc/gallery_event.dart';
+import 'package:ShEC_CSE/features/alumni/presentation/bloc/alumni_bloc.dart';
+import 'package:ShEC_CSE/features/alumni/presentation/bloc/alumni_event.dart';
+import 'package:ShEC_CSE/features/contests/presentation/bloc/contest_bloc.dart';
+import 'package:ShEC_CSE/features/contests/presentation/bloc/contest_event.dart';
+import 'package:ShEC_CSE/features/jobs/presentation/bloc/job_bloc.dart';
+import 'package:ShEC_CSE/features/jobs/presentation/bloc/job_event.dart';
+import 'package:ShEC_CSE/features/resources/presentation/bloc/resource_bloc.dart';
+import 'package:ShEC_CSE/features/resources/presentation/bloc/resource_event.dart';
+import 'package:ShEC_CSE/features/department/presentation/bloc/teacher_bloc.dart';
+import 'package:ShEC_CSE/features/department/presentation/bloc/teacher_event.dart';
+import 'package:ShEC_CSE/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:ShEC_CSE/features/profile/presentation/bloc/profile_event.dart';
+import 'package:ShEC_CSE/features/about/presentation/bloc/contributor_bloc.dart';
+import 'package:ShEC_CSE/features/about/presentation/bloc/contributor_event.dart';
+
+// Import Repositories
+import 'package:ShEC_CSE/features/gallery/data/repositories/gallery_repository_impl.dart';
+import 'package:ShEC_CSE/features/alumni/data/repositories/alumni_repository_impl.dart';
+import 'package:ShEC_CSE/features/contests/data/repositories/contest_repository_impl.dart';
+import 'package:ShEC_CSE/features/jobs/data/repositories/job_repository_impl.dart';
+import 'package:ShEC_CSE/features/resources/data/repositories/resource_repository_impl.dart';
+import 'package:ShEC_CSE/features/department/data/repositories/teacher_repository_impl.dart';
+import 'package:ShEC_CSE/features/profile/data/repositories/profile_repository_impl.dart';
+import 'package:ShEC_CSE/features/about/data/repositories/contributor_repository_impl.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -68,6 +94,46 @@ Future<void> main() async {
         BlocProvider<AccountingBloc>(
           create: (context) => AccountingBloc(),
         ),
+        BlocProvider<GalleryBloc>(
+          create: (context) => GalleryBloc(
+            galleryRepository: GalleryRepositoryImpl(),
+          )..add(const FetchGalleryItemsRequested()),
+        ),
+        BlocProvider<AlumniBloc>(
+          create: (context) => AlumniBloc(
+            alumniRepository: AlumniRepositoryImpl(),
+          )..add(const FetchAlumniRequested()),
+        ),
+        BlocProvider<ContestBloc>(
+          create: (context) => ContestBloc(
+            contestRepository: ContestRepositoryImpl(),
+          )..add(const FetchContestsRequested()),
+        ),
+        BlocProvider<JobBloc>(
+          create: (context) => JobBloc(
+            jobRepository: JobRepositoryImpl(),
+          )..add(const FetchJobsRequested()),
+        ),
+        BlocProvider<ResourceBloc>(
+          create: (context) => ResourceBloc(
+            resourceRepository: ResourceRepositoryImpl(),
+          )..add(const FetchResourcesRequested()),
+        ),
+        BlocProvider<TeacherBloc>(
+          create: (context) => TeacherBloc(
+            teacherRepository: TeacherRepositoryImpl(),
+          )..add(const FetchTeachersRequested()),
+        ),
+        BlocProvider<ProfileBloc>(
+          create: (context) => ProfileBloc(
+            profileRepository: ProfileRepositoryImpl(),
+          )..add(const FetchProfileRequested()),
+        ),
+        BlocProvider<ContributorBloc>(
+          create: (context) => ContributorBloc(
+            ContributorRepositoryImpl(),
+          )..add(const FetchContributorsRequested()),
+        ),
       ],
       child: ShEcCseApp(isLoggedIn: isLoggedIn),
     ),
@@ -97,4 +163,4 @@ class ShEcCseApp extends StatelessWidget {
       },
     );
   }
-}
+}

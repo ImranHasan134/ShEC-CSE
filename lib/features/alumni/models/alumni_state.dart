@@ -83,5 +83,3 @@ class AlumniItem {
   }
 }
 
-// Global Notifier
-final ValueNotifier<List<AlumniItem>> alumniState = ValueNotifier([]);

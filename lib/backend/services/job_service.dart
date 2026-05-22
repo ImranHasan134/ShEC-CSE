@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/jobs/models/job_state.dart';
 import '../../features/profile/models/profile_state.dart';
@@ -6,9 +7,15 @@ import 'notification_service.dart';
 
 class JobService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<JobItem> _jobItems = [];
 
-  static Future<void> fetchJobs({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.jobsRecommended)) return;
+  static final StreamController<List<JobItem>> _jobsStreamController = StreamController.broadcast();
+  static Stream<List<JobItem>> get jobsStream => _jobsStreamController.stream;
+
+  static List<JobItem> get jobItems => _jobItems;
+
+  static Future<List<JobItem>> fetchJobs({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.jobsRecommended)) return _jobItems;
     
     final isAdmin = currentProfile.value.role != UserRole.student;
     
@@ -18,10 +25,11 @@ class JobService {
     }
     
     final response = await query.order('created_at', ascending: false);
-    final List<JobItem> jobs = response.map((row) => JobItem.fromJson(row)).toList();
+    _jobItems = (response as List).map((row) => JobItem.fromJson(row)).toList();
 
-    jobsState.value = jobs;
+    _jobsStreamController.add(_jobItems);
     CacheService.markFresh(CacheKeys.jobsRecommended);
+    return _jobItems;
   }
 
   static Future<void> addJobToDB(JobItem job) async {
@@ -40,7 +48,8 @@ class JobService {
         .single();
 
     final newJob = JobItem.fromJson(response);
-    jobsState.value = List.from(jobsState.value)..insert(0, newJob);
+    _jobItems = List.from(_jobItems)..insert(0, newJob);
+    _jobsStreamController.add(_jobItems);
     CacheService.invalidate(CacheKeys.jobsRecommended);
   }
 
@@ -54,19 +63,19 @@ class JobService {
         .eq('id', job.id);
         
     CacheService.invalidate(CacheKeys.jobsRecommended);
-    fetchJobs(forceRefresh: true);
+    await fetchJobs(forceRefresh: true);
   }
 
   static Future<void> approveJob(String id) async {
     await _client.from('jobs').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.jobsRecommended);
-    fetchJobs(forceRefresh: true);
+    await fetchJobs(forceRefresh: true);
   }
 
   static Future<void> toggleJobVisibility(String id, bool isVisible) async {
     await _client.from('jobs').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.jobsRecommended);
-    fetchJobs(forceRefresh: true);
+    await fetchJobs(forceRefresh: true);
   }
 
   static Future<void> deleteJobFromDB(String id) async {
@@ -75,8 +84,8 @@ class JobService {
         .delete()
         .eq('id', id);
 
-    jobsState.value = List.from(jobsState.value)
-        ..removeWhere((job) => job.id == id);
+    _jobItems = List.from(_jobItems)..removeWhere((job) => job.id == id);
+    _jobsStreamController.add(_jobItems);
     CacheService.invalidate(CacheKeys.jobsRecommended);
   }
 
@@ -101,8 +110,8 @@ class JobService {
               NotificationService.incrementUnread('jobs');
               NotificationService.showNotification(
                 id: 2,
-                title: 'New Job Opening: ${data['title']}',
-                body: '${data['company']} is hiring! Check it out in the Job Board.',
+                title: 'New Job Opening: ${data['title'] ?? 'Role'}',
+                body: '${data['company'] ?? 'Company'} is hiring! Check it out in the Job Board.',
               );
             }
           }

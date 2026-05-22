@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'notice_event.dart';
 import 'notice_state.dart';
@@ -5,6 +6,8 @@ import '../../../../backend/services/notice_service.dart';
 import '../../models/notice_state.dart';
 
 class NoticeBloc extends Bloc<NoticeEvent, NoticeState> {
+  StreamSubscription? _noticesSubscription;
+
   NoticeBloc() : super(NoticeInitial()) {
     on<FetchNoticesRequested>(_onFetchNoticesRequested);
     on<AddNoticeRequested>(_onAddNoticeRequested);
@@ -12,6 +15,24 @@ class NoticeBloc extends Bloc<NoticeEvent, NoticeState> {
     on<DeleteNoticeRequested>(_onDeleteNoticeRequested);
     on<ApproveNoticeRequested>(_onApproveNoticeRequested);
     on<ToggleNoticeVisibilityRequested>(_onToggleNoticeVisibilityRequested);
+    on<NoticesUpdatedPrivate>(_onNoticesUpdatedPrivate);
+
+    _noticesSubscription = NoticeService.noticesStream.listen((data) {
+      add(NoticesUpdatedPrivate(clubNotices: data.club, deptNotices: data.dept));
+    });
+  }
+
+  void _onNoticesUpdatedPrivate(NoticesUpdatedPrivate event, Emitter<NoticeState> emit) {
+    emit(NoticesLoaded(
+      clubNotices: event.clubNotices,
+      deptNotices: event.deptNotices,
+    ));
+  }
+
+  @override
+  Future<void> close() {
+    _noticesSubscription?.cancel();
+    return super.close();
   }
 
   Future<void> _onFetchNoticesRequested(
@@ -20,10 +41,10 @@ class NoticeBloc extends Bloc<NoticeEvent, NoticeState> {
   ) async {
     emit(NoticeLoading());
     try {
-      await NoticeService.fetchNotices(forceRefresh: event.forceRefresh);
+      final result = await NoticeService.fetchNotices(forceRefresh: event.forceRefresh);
       emit(NoticesLoaded(
-        clubNotices: List.from(clubNoticesState.value),
-        deptNotices: List.from(deptNoticesState.value),
+        clubNotices: result.club,
+        deptNotices: result.dept,
       ));
     } catch (e) {
       emit(NoticeError(message: e.toString()));

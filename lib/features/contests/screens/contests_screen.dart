@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import '../models/contest_state.dart';
+import '../presentation/bloc/contest_bloc.dart';
+import '../presentation/bloc/contest_event.dart';
+import '../presentation/bloc/contest_state.dart';
 import '../../../backend/services/contest_service.dart';
 import 'package:ShEC_CSE/core/utils/validation_rules.dart';
 
@@ -16,7 +20,7 @@ class _ContestsScreenState extends State<ContestsScreen> {
   @override
   void initState() {
     super.initState();
-    ContestService.fetchContestsAndCourses();
+    context.read<ContestBloc>().add(const FetchContestsRequested(forceRefresh: true));
   }
 
   Future<void> _launchURL(String urlString) async {
@@ -32,6 +36,7 @@ class _ContestsScreenState extends State<ContestsScreen> {
   }
 
   void _showForm(BuildContext context, {ContestItem? existingItem}) {
+    final contestBloc = context.read<ContestBloc>();
     final titleController = TextEditingController(text: existingItem?.title ?? '');
     final platformController = TextEditingController(text: existingItem?.platform ?? '');
     final levelController = TextEditingController(text: existingItem?.level ?? '');
@@ -145,10 +150,10 @@ class _ContestsScreenState extends State<ContestsScreen> {
                               );
   
                               if (existingItem == null) {
-                                await ContestService.addContestToDB(item);
+                                contestBloc.add(AddContestRequested(item: item));
                                 if (mounted) messenger.showSnackBar(const SnackBar(content: Text('Contest added')));
                               } else {
-                                await ContestService.updateContestInDB(item);
+                                contestBloc.add(UpdateContestRequested(item: item));
                                 if (mounted) messenger.showSnackBar(const SnackBar(content: Text('Contest updated')));
                               }
                             } catch (e) {
@@ -178,14 +183,21 @@ class _ContestsScreenState extends State<ContestsScreen> {
       appBar: AppBar(
         title: const Text('Contests'),
       ),
-      body: ValueListenableBuilder<List<ContestItem>>(
-        valueListenable: contestState,
-        builder: (context, items, _) {
+      body: BlocBuilder<ContestBloc, ContestState>(
+        builder: (context, state) {
           final isAdmin = currentProfile.value.role != UserRole.student;
-          final visibleItems = items.where((j) {
-            if (isAdmin) return true;
-            return j.isApproved && j.isVisible;
-          }).toList();
+          List<ContestItem> visibleItems = [];
+
+          if (state is ContestLoading || state is ContestInitial) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is ContestError) {
+            return Center(child: Text(state.message));
+          } else if (state is ContestLoaded) {
+            visibleItems = state.items.where((j) {
+              if (isAdmin) return true;
+              return j.isApproved && j.isVisible;
+            }).toList();
+          }
 
           if (visibleItems.isEmpty) {
             return Center(
@@ -201,7 +213,9 @@ class _ContestsScreenState extends State<ContestsScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () => ContestService.fetchContestsAndCourses(forceRefresh: true),
+            onRefresh: () async {
+              context.read<ContestBloc>().add(const FetchContestsRequested(forceRefresh: true));
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(16.0),
               itemCount: visibleItems.length,
@@ -346,13 +360,9 @@ class _ContestsScreenState extends State<ContestsScreen> {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             tooltip: 'Approve Contest',
-            onPressed: () async {
-              try {
-                await ContestService.approveContest(item.id);
-                if (context.mounted) _showToast(context, 'Contest approved successfully!', isError: false);
-              } catch (e) {
-                if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-              }
+            onPressed: () {
+              context.read<ContestBloc>().add(ApproveContestRequested(itemId: item.id));
+              _showToast(context, 'Contest approved successfully!', isError: false);
             },
           ),
           const SizedBox(width: 12),
@@ -362,13 +372,9 @@ class _ContestsScreenState extends State<ContestsScreen> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: item.isVisible ? 'Hide Contest' : 'Show Contest',
-          onPressed: () async {
-            try {
-              await ContestService.toggleContestVisibility(item.id, !item.isVisible);
-              if (context.mounted) _showToast(context, item.isVisible ? 'Contest hidden!' : 'Contest is now visible!', isError: false);
-            } catch (e) {
-              if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-            }
+          onPressed: () {
+            context.read<ContestBloc>().add(ToggleContestVisibilityRequested(itemId: item.id, isVisible: !item.isVisible));
+            _showToast(context, item.isVisible ? 'Contest hidden!' : 'Contest is now visible!', isError: false);
           },
         ),
         const SizedBox(width: 12),
@@ -385,13 +391,9 @@ class _ContestsScreenState extends State<ContestsScreen> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: 'Delete Contest',
-          onPressed: () async {
-            try {
-              await ContestService.deleteContestFromDB(item);
-              if (context.mounted) _showToast(context, 'Contest deleted successfully!', isError: false);
-            } catch (e) {
-              if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-            }
+          onPressed: () {
+            context.read<ContestBloc>().add(DeleteContestRequested(item: item));
+            _showToast(context, 'Contest deleted successfully!', isError: false);
           },
         ),
       ],

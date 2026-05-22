@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ShEC_CSE/core/services/image_processing_service.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -7,6 +8,9 @@ import '../../../backend/services/alumni_service.dart';
 import '../../../backend/services/auth_service.dart';
 import '../../profile/models/profile_state.dart';
 import '../models/alumni_state.dart';
+import '../presentation/bloc/alumni_bloc.dart';
+import '../presentation/bloc/alumni_event.dart';
+import '../presentation/bloc/alumni_state.dart';
 import 'alumni_detail_screen.dart';
 
 class AlumniScreen extends StatefulWidget {
@@ -24,7 +28,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
   @override
   void initState() {
     super.initState();
-    AlumniService.fetchAlumni();
+    context.read<AlumniBloc>().add(const FetchAlumniRequested(forceRefresh: true));
     _loadSessions();
   }
 
@@ -41,6 +45,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
   }
 
   void _showAlumniForm({AlumniItem? existing}) {
+    final alumniBloc = context.read<AlumniBloc>();
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final emailCtrl = TextEditingController(text: existing?.email ?? '');
     final phoneCtrl = TextEditingController(text: existing?.phone ?? '');
@@ -223,9 +228,9 @@ class _AlumniScreenState extends State<AlumniScreen> {
                         if (mounted) {
                           Navigator.pop(modalContext);
                           if (existing == null) {
-                            await AlumniService.addAlumni(item);
+                            alumniBloc.add(AddAlumniRequested(item: item));
                           } else {
-                            await AlumniService.updateAlumni(item);
+                            alumniBloc.add(UpdateAlumniRequested(item: item));
                           }
                         }
                       },
@@ -259,11 +264,18 @@ class _AlumniScreenState extends State<AlumniScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Alumni')),
-      body: ValueListenableBuilder<List<AlumniItem>>(
-        valueListenable: alumniState,
-        builder: (context, alumni, _) {
+      body: BlocBuilder<AlumniBloc, AlumniState>(
+        builder: (context, state) {
           final isAdmin = currentProfile.value.role != UserRole.student;
-          final visible = isAdmin ? alumni : alumni.where((a) => a.isApproved && a.isVisible).toList();
+          List<AlumniItem> visible = [];
+          if (state is AlumniLoading || state is AlumniInitial) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is AlumniError) {
+            return Center(child: Text(state.message));
+          } else if (state is AlumniLoaded) {
+            final alumni = state.items;
+            visible = isAdmin ? alumni : alumni.where((a) => a.isApproved && a.isVisible).toList();
+          }
 
           if (visible.isEmpty) {
             return Center(
@@ -278,10 +290,15 @@ class _AlumniScreenState extends State<AlumniScreen> {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: visible.length,
-            itemBuilder: (context, index) => _buildCard(visible[index]),
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<AlumniBloc>().add(const FetchAlumniRequested(forceRefresh: true));
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: visible.length,
+              itemBuilder: (context, index) => _buildCard(visible[index]),
+            ),
           );
         },
       ),
@@ -400,13 +417,9 @@ class _AlumniScreenState extends State<AlumniScreen> {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             tooltip: 'Approve Alumni',
-            onPressed: () async {
-              try {
-                await AlumniService.approveAlumni(alumni.id);
-                if (mounted) _showToast('Alumni approved successfully!', isError: false);
-              } catch (e) {
-                if (mounted) _showToast('Error: $e', isError: true);
-              }
+            onPressed: () {
+              context.read<AlumniBloc>().add(ApproveAlumniRequested(itemId: alumni.id));
+              _showToast('Alumni approved successfully!', isError: false);
             },
           ),
           const SizedBox(width: 12),
@@ -416,13 +429,9 @@ class _AlumniScreenState extends State<AlumniScreen> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: alumni.isVisible ? 'Hide Alumni' : 'Show Alumni',
-          onPressed: () async {
-            try {
-              await AlumniService.toggleAlumniVisibility(alumni.id, !alumni.isVisible);
-              if (mounted) _showToast(alumni.isVisible ? 'Alumni profile hidden!' : 'Alumni profile is now visible!', isError: false);
-            } catch (e) {
-              if (mounted) _showToast('Error: $e', isError: true);
-            }
+          onPressed: () {
+            context.read<AlumniBloc>().add(ToggleAlumniVisibilityRequested(itemId: alumni.id, isVisible: !alumni.isVisible));
+            _showToast(alumni.isVisible ? 'Alumni profile hidden!' : 'Alumni profile is now visible!', isError: false);
           },
         ),
         const SizedBox(width: 12),
@@ -439,13 +448,9 @@ class _AlumniScreenState extends State<AlumniScreen> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: 'Delete Alumni',
-          onPressed: () async {
-            try {
-              await AlumniService.deleteAlumni(alumni);
-              if (mounted) _showToast('Alumni deleted successfully!', isError: false);
-            } catch (e) {
-              if (mounted) _showToast('Error: $e', isError: true);
-            }
+          onPressed: () {
+            context.read<AlumniBloc>().add(DeleteAlumniRequested(item: alumni));
+            _showToast('Alumni deleted successfully!', isError: false);
           },
         ),
       ],

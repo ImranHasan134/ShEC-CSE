@@ -1,30 +1,33 @@
+import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/department/models/teacher_state.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
 import '../../core/services/storage_service.dart';
 
-
 class TeacherService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<TeacherContact> _teachers = [];
 
-  static Future<void> fetchTeachers({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.teachers)) return;
+  static final StreamController<List<TeacherContact>> _teachersStreamController = StreamController.broadcast();
+  static Stream<List<TeacherContact>> get teachersStream => _teachersStreamController.stream;
 
-    try {
-      final isAdmin = currentProfile.value.role != UserRole.student;
-      var query = _client.from('teachers').select();
-      if (!isAdmin) {
-        query = query.eq('is_approved', true).eq('is_visible', true);
-      }
-      final response = await query.order('created_at', ascending: false);
-      teachersState.value = (response as List).map((e) => TeacherContact.fromJson(e)).toList();
-      CacheService.markFresh(CacheKeys.teachers);
-    } catch (e) {
-      debugPrint('Error fetching teachers: $e');
+  static List<TeacherContact> get teachers => _teachers;
+
+  static Future<List<TeacherContact>> fetchTeachers({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.teachers) && _teachers.isNotEmpty) return _teachers;
+
+    final isAdmin = currentProfile.value.role != UserRole.student;
+    var query = _client.from('teachers').select();
+    if (!isAdmin) {
+      query = query.eq('is_approved', true).eq('is_visible', true);
     }
+    final response = await query.order('created_at', ascending: false);
+    _teachers = (response as List).map((e) => TeacherContact.fromJson(e)).toList();
+    _teachersStreamController.add(_teachers);
+    CacheService.markFresh(CacheKeys.teachers);
+    return _teachers;
   }
 
   static Future<void> addTeacher(TeacherContact teacher) async {
@@ -62,21 +65,18 @@ class TeacherService {
   }
 
   static Future<void> deleteTeacher(TeacherContact teacher) async {
-    try {
-      // 1. Delete image from storage
-      if (teacher.imagePath.isNotEmpty) {
+    if (teacher.imagePath.isNotEmpty) {
+      try {
         await StorageService.deleteFile(teacher.imagePath);
+      } catch (e) {
+        // ignore
       }
-
-      // 2. Delete from DB
-      await _client.from('teachers').delete().eq('id', teacher.id);
-      
-      teachersState.value = teachersState.value.where((t) => t.id != teacher.id).toList();
-      CacheService.invalidate(CacheKeys.teachers);
-    } catch (e) {
-      debugPrint('Error deleting teacher: $e');
-      rethrow;
     }
+
+    await _client.from('teachers').delete().eq('id', teacher.id);
+    _teachers = _teachers.where((t) => t.id != teacher.id).toList();
+    _teachersStreamController.add(_teachers);
+    CacheService.invalidate(CacheKeys.teachers);
   }
 
   static Future<String?> uploadImage(File file) async {

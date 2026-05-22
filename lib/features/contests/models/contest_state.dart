@@ -81,5 +81,3 @@ class ContestItem {
   }
 }
 
-final ValueNotifier<List<ContestItem>> contestState = ValueNotifier([]);
-final ValueNotifier<List<ContestItem>> courseState = ValueNotifier([]);

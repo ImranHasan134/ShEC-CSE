@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import 'package:ShEC_CSE/core/services/image_processing_service.dart';
 import '../models/gallery_state.dart';
+import '../presentation/bloc/gallery_bloc.dart';
+import '../presentation/bloc/gallery_event.dart';
+import '../presentation/bloc/gallery_state.dart';
 import '../../../backend/services/gallery_service.dart';
 import 'gallery_detail_screen.dart';
 import 'package:ShEC_CSE/core/utils/validation_rules.dart';
@@ -19,10 +23,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   void initState() {
     super.initState();
-    GalleryService.fetchGalleryItems(forceRefresh: true);
+    context.read<GalleryBloc>().add(const FetchGalleryItemsRequested(forceRefresh: true));
   }
 
   void _showGalleryForm(BuildContext context, {GalleryItem? existingItem}) {
+    final galleryBloc = context.read<GalleryBloc>();
     final titleController = TextEditingController(text: existingItem?.title ?? '');
     final descriptionController = TextEditingController(text: existingItem?.description ?? '');
     bool isVisible = existingItem?.isVisible ?? true;
@@ -294,9 +299,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               );
     
                               if (existingItem == null) {
-                                await GalleryService.addGalleryItemToDB(item);
+                                galleryBloc.add(AddGalleryItemRequested(item: item));
                               } else {
-                                await GalleryService.updateGalleryItemInDB(item);
+                                galleryBloc.add(UpdateGalleryItemRequested(item: item));
                               }
                             },
                             style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
@@ -326,16 +331,22 @@ class _GalleryScreenState extends State<GalleryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Gallery')),
-      body: ValueListenableBuilder<List<GalleryItem>>(
-        valueListenable: galleryState,
-        builder: (context, items, _) {
+      body: BlocBuilder<GalleryBloc, GalleryState>(
+        builder: (context, state) {
           final profile = currentProfile.value;
           final isAdmin = profile.role != UserRole.student;
 
-          final visibleItems = items.where((n) {
-            if (isAdmin) return true;
-            return n.isApproved && n.isVisible;
-          }).toList();
+          List<GalleryItem> visibleItems = [];
+          if (state is GalleryLoading || state is GalleryInitial) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is GalleryError) {
+            return Center(child: Text(state.message));
+          } else if (state is GalleryLoaded) {
+            visibleItems = state.items.where((n) {
+              if (isAdmin) return true;
+              return n.isApproved && n.isVisible;
+            }).toList();
+          }
 
           if (visibleItems.isEmpty) {
             return Center(
@@ -356,7 +367,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () => GalleryService.fetchGalleryItems(forceRefresh: true),
+            onRefresh: () async {
+              context.read<GalleryBloc>().add(const FetchGalleryItemsRequested(forceRefresh: true));
+            },
             child: GridView.builder(
               padding: const EdgeInsets.all(16.0),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -516,13 +529,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     if (!item.isApproved &&
                         (profile.designation == 'President' || profile.designation == 'Vice President')) ...[
                       GestureDetector(
-                        onTap: () async {
-                          try {
-                            await GalleryService.approveGalleryItem(item.id);
-                            if (context.mounted) _showToast(context, 'Gallery item approved!', isError: false);
-                          } catch (e) {
-                            if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-                          }
+                        onTap: () {
+                          context.read<GalleryBloc>().add(ApproveGalleryItemRequested(itemId: item.id));
+                          _showToast(context, 'Gallery item approved!', isError: false);
                         },
                         child: const Tooltip(
                           message: 'Approve Gallery Item',
@@ -532,15 +541,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       const SizedBox(width: 10),
                     ],
                     GestureDetector(
-                      onTap: () async {
-                        try {
-                          await GalleryService.toggleGalleryVisibility(item.id, !item.isVisible);
-                          if (context.mounted) {
-                            _showToast(context, item.isVisible ? 'Gallery item hidden!' : 'Gallery item is now visible!', isError: false);
-                          }
-                        } catch (e) {
-                          if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-                        }
+                      onTap: () {
+                        context.read<GalleryBloc>().add(ToggleGalleryVisibilityRequested(itemId: item.id, isVisible: !item.isVisible));
+                        _showToast(context, item.isVisible ? 'Gallery item hidden!' : 'Gallery item is now visible!', isError: false);
                       },
                       child: Tooltip(
                         message: item.isVisible ? 'Hide Item' : 'Show Item',
@@ -557,13 +560,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
-                      onTap: () async {
-                        try {
-                          await GalleryService.deleteGalleryItemFromDB(item);
-                          if (context.mounted) _showToast(context, 'Gallery item deleted successfully!', isError: false);
-                        } catch (e) {
-                          if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-                        }
+                      onTap: () {
+                        context.read<GalleryBloc>().add(DeleteGalleryItemRequested(item: item));
+                        _showToast(context, 'Gallery item deleted successfully!', isError: false);
                       },
                       child: const Tooltip(
                         message: 'Delete Item',

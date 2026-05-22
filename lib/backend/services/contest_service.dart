@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/contests/models/contest_state.dart';
 import '../../features/profile/models/profile_state.dart';
@@ -6,9 +7,15 @@ import 'notification_service.dart';
 
 class ContestService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<ContestItem> _contestItems = [];
 
-  static Future<void> fetchContestsAndCourses({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.contests)) return;
+  static final StreamController<List<ContestItem>> _contestStreamController = StreamController.broadcast();
+  static Stream<List<ContestItem>> get contestStream => _contestStreamController.stream;
+
+  static List<ContestItem> get contestItems => _contestItems;
+
+  static Future<List<ContestItem>> fetchContestsAndCourses({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.contests)) return _contestItems;
 
     final isAdmin = currentProfile.value.role != UserRole.student;
 
@@ -18,11 +25,11 @@ class ContestService {
     }
     
     final response = await query.order('created_at', ascending: false);
-    final List<ContestItem> fetchedContests = response.map((row) => ContestItem.fromJson(row)).toList();
+    _contestItems = (response as List).map((row) => ContestItem.fromJson(row)).toList();
 
-    contestState.value = fetchedContests;
-    courseState.value = [];
+    _contestStreamController.add(_contestItems);
     CacheService.markFresh(CacheKeys.contests);
+    return _contestItems;
   }
 
   static Future<void> addContestToDB(ContestItem item) async {
@@ -41,14 +48,15 @@ class ContestService {
         .single();
 
     final newItem = ContestItem.fromJson(response);
-    contestState.value = List.from(contestState.value)..insert(0, newItem);
+    _contestItems = List.from(_contestItems)..insert(0, newItem);
+    _contestStreamController.add(_contestItems);
     CacheService.invalidate(CacheKeys.contests);
   }
 
   static Future<void> toggleContestVisibility(String id, bool isVisible) async {
     await _client.from('contests').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.contests);
-    fetchContestsAndCourses(forceRefresh: true);
+    await fetchContestsAndCourses(forceRefresh: true);
   }
 
   static Future<void> updateContestInDB(ContestItem item) async {
@@ -67,13 +75,13 @@ class ContestService {
         .eq('id', item.id);
         
     CacheService.invalidate(CacheKeys.contests);
-    fetchContestsAndCourses(forceRefresh: true);
+    await fetchContestsAndCourses(forceRefresh: true);
   }
 
   static Future<void> approveContest(String id) async {
     await _client.from('contests').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.contests);
-    fetchContestsAndCourses(forceRefresh: true);
+    await fetchContestsAndCourses(forceRefresh: true);
   }
 
   static Future<void> deleteContestFromDB(ContestItem item) async {
@@ -82,7 +90,8 @@ class ContestService {
         .delete()
         .eq('id', item.id);
 
-    contestState.value = List.from(contestState.value)..removeWhere((i) => i.id == item.id);
+    _contestItems = List.from(_contestItems)..removeWhere((i) => i.id == item.id);
+    _contestStreamController.add(_contestItems);
     CacheService.invalidate(CacheKeys.contests);
   }
 

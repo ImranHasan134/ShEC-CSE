@@ -65,3 +65,13 @@ class ToggleNoticeVisibilityRequested extends NoticeEvent {
   @override
   List<Object?> get props => [noticeId, isVisible];
 }
+
+class NoticesUpdatedPrivate extends NoticeEvent {
+  final List<NoticeItem> clubNotices;
+  final List<NoticeItem> deptNotices;
+
+  const NoticesUpdatedPrivate({required this.clubNotices, required this.deptNotices});
+
+  @override
+  List<Object?> get props => [clubNotices, deptNotices];
+}

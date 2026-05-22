@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/gallery/models/gallery_state.dart';
@@ -6,12 +7,17 @@ import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
 import '../../core/services/storage_service.dart';
 
-
 class GalleryService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<GalleryItem> _galleryItems = [];
 
-  static Future<void> fetchGalleryItems({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.gallery)) return;
+  static final StreamController<List<GalleryItem>> _galleryStreamController = StreamController.broadcast();
+  static Stream<List<GalleryItem>> get galleryStream => _galleryStreamController.stream;
+
+  static List<GalleryItem> get galleryItems => _galleryItems;
+
+  static Future<List<GalleryItem>> fetchGalleryItems({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.gallery)) return _galleryItems;
     
     final isAdmin = currentProfile.value.role != UserRole.student;
     
@@ -21,8 +27,10 @@ class GalleryService {
     }
     
     final response = await query.order('created_at', ascending: false);
-    galleryState.value = (response as List).map((r) => GalleryItem.fromJson(r)).toList();
+    _galleryItems = (response as List).map((r) => GalleryItem.fromJson(r)).toList();
     CacheService.markFresh(CacheKeys.gallery);
+    _galleryStreamController.add(_galleryItems);
+    return _galleryItems;
   }
 
   static Future<void> addGalleryItemToDB(GalleryItem item) async {
@@ -41,7 +49,8 @@ class GalleryService {
         .single();
 
     final newItem = GalleryItem.fromJson(response);
-    galleryState.value = List.from(galleryState.value)..insert(0, newItem);
+    _galleryItems = List.from(_galleryItems)..insert(0, newItem);
+    _galleryStreamController.add(_galleryItems);
     CacheService.invalidate(CacheKeys.gallery);
   }
 
@@ -55,19 +64,19 @@ class GalleryService {
         .eq('id', item.id);
         
     CacheService.invalidate(CacheKeys.gallery);
-    fetchGalleryItems(forceRefresh: true);
+    await fetchGalleryItems(forceRefresh: true);
   }
 
   static Future<void> approveGalleryItem(String id) async {
     await _client.from('gallery').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.gallery);
-    fetchGalleryItems(forceRefresh: true);
+    await fetchGalleryItems(forceRefresh: true);
   }
 
   static Future<void> toggleGalleryVisibility(String id, bool isVisible) async {
     await _client.from('gallery').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.gallery);
-    fetchGalleryItems(forceRefresh: true);
+    await fetchGalleryItems(forceRefresh: true);
   }
 
   static Future<void> deleteGalleryItemFromDB(GalleryItem item) async {
@@ -86,7 +95,8 @@ class GalleryService {
       // 2. Delete from DB
       await _client.from('gallery').delete().eq('id', item.id);
 
-      galleryState.value = List.from(galleryState.value)..removeWhere((i) => i.id == item.id);
+      _galleryItems = List.from(_galleryItems)..removeWhere((i) => i.id == item.id);
+      _galleryStreamController.add(_galleryItems);
       CacheService.invalidate(CacheKeys.gallery);
     } catch (e) {
       debugPrint('Error deleting gallery item: $e');

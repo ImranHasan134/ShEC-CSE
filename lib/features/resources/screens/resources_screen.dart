@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import '../models/resource_state.dart';
+import '../presentation/bloc/resource_bloc.dart';
+import '../presentation/bloc/resource_event.dart';
+import '../presentation/bloc/resource_state.dart' as bloc_state;
 import '../../../backend/services/resource_service.dart';
 import 'package:ShEC_CSE/core/utils/validation_rules.dart';
 
@@ -50,7 +54,7 @@ class YearsScreen extends StatelessWidget {
       color: colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colors.outline.withOpacity(0.1)),
+        side: BorderSide(color: colors.outline.withValues(alpha: 0.1)),
       ),
       child: InkWell(
         onTap: () {
@@ -67,7 +71,7 @@ class YearsScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.school_rounded, color: color, size: 28),
@@ -82,7 +86,7 @@ class YearsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colors.onSurfaceVariant.withOpacity(0.5)),
+              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colors.onSurfaceVariant.withValues(alpha: 0.5)),
             ],
           ),
         ),
@@ -124,7 +128,6 @@ class SemestersScreen extends StatelessWidget {
   }
 
   Widget _buildSemesterCard(BuildContext context, int semIndex, ColorScheme colors) {
-    // Determine actual semester number (1-8)
     final int actualSem = ((yearIndex - 1) * 2) + semIndex;
     final String semTitle = '$semIndex${semIndex == 1 ? "st" : "nd"} Semester';
 
@@ -134,13 +137,13 @@ class SemestersScreen extends StatelessWidget {
       color: colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colors.outline.withOpacity(0.1)),
+        side: BorderSide(color: colors.outline.withValues(alpha: 0.1)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
           child: Icon(Icons.layers_rounded, color: color),
         ),
         title: Text(semTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
@@ -185,7 +188,6 @@ class SessionsScreen extends StatelessWidget {
   });
 
   List<String> _getValidSessions() {
-    // Dynamic session list based on recent years
     return ['24-25', '23-24', '22-23', '21-22', '20-21', '19-20'];
   }
 
@@ -211,7 +213,7 @@ class SessionsScreen extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: colors.outline.withOpacity(0.1)),
+              side: BorderSide(color: colors.outline.withValues(alpha: 0.1)),
             ),
             child: ListTile(
               leading: Icon(Icons.calendar_today_rounded, color: color),
@@ -238,7 +240,6 @@ class SessionsScreen extends StatelessWidget {
   }
 }
 
-
 // ==========================================
 // 4. PDFs (FILES) SCREEN
 // ==========================================
@@ -264,7 +265,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
   @override
   void initState() {
     super.initState();
-    ResourceService.fetchResources();
+    context.read<ResourceBloc>().add(const FetchResourcesRequested());
   }
 
   void _showForm(BuildContext context, {ResourceItem? existingItem}) {
@@ -334,31 +335,24 @@ class _PdfsScreenState extends State<PdfsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    onPressed: () async {
+                    onPressed: () {
                       if (!formKey.currentState!.validate()) return;
                       
                       Navigator.pop(modalContext);
-                      try {
-                        final newItem = ResourceItem(
-                          id: existingItem?.id ?? '',
-                          name: nameController.text.trim(),
-                          date: DateTime.now().toString().split(' ')[0],
-                          session: widget.session,
-                          semester: widget.semester,
-                          fileUrl: urlController.text.trim(),
-                          uploadedBy: currentProfile.value.id,
-                        );
-  
-                        if (existingItem == null) {
-                          await ResourceService.addResourceToDB(newItem);
-                          if (mounted) _showToast('Resource uploaded successfully!', isError: false);
-                        } else {
-                          await ResourceService.updateResourceInDB(newItem);
-                          ResourceService.fetchResources(); // Refresh
-                          if (mounted) _showToast('Resource updated successfully!', isError: false);
-                        }
-                      } catch (e) {
-                        if (mounted) _showToast('Error: $e', isError: true);
+                      final newItem = ResourceItem(
+                        id: existingItem?.id ?? '',
+                        name: nameController.text.trim(),
+                        date: existingItem?.date ?? DateTime.now().toString().split(' ')[0],
+                        session: widget.session,
+                        semester: widget.semester,
+                        fileUrl: urlController.text.trim(),
+                        uploadedBy: existingItem?.uploadedBy ?? currentProfile.value.id,
+                      );
+
+                      if (existingItem == null) {
+                        context.read<ResourceBloc>().add(AddResourceRequested(item: newItem));
+                      } else {
+                        context.read<ResourceBloc>().add(UpdateResourceRequested(item: newItem));
                       }
                     },
                     child: Text(existingItem == null ? 'Upload Now' : 'Save Changes'),
@@ -385,17 +379,12 @@ class _PdfsScreenState extends State<PdfsScreen> {
       ),
     );
 
-    if (confirm == true) {
-      try {
-        await ResourceService.deleteResourceFromDB(item);
-        if (mounted) _showToast('Resource deleted successfully!', isError: false);
-      } catch (e) {
-        if (mounted) _showToast('Error: $e', isError: true);
-      }
+    if (confirm == true && mounted) {
+      context.read<ResourceBloc>().add(DeleteResourceRequested(item: item));
     }
   }
 
-  void _showToast(String message, {required bool isError}) {
+  void _showToast(BuildContext context, String message, {required bool isError}) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -421,111 +410,135 @@ class _PdfsScreenState extends State<PdfsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.session)),
-      body: ValueListenableBuilder<List<ResourceItem>>(
-        valueListenable: resourceState,
-        builder: (context, items, _) {
-          // Filter resources for this specific session AND semester
-          final sessionItems = items.where((i) => i.session == widget.session && i.semester == widget.semester).toList();
+      body: BlocListener<ResourceBloc, bloc_state.ResourceState>(
+        listener: (context, state) {
+          if (state is bloc_state.ResourceError) {
+            _showToast(context, state.message, isError: true);
+          } else if (state is bloc_state.ResourceOperationSuccess) {
+            _showToast(context, 'Operation successful!', isError: false);
+          }
+        },
+        child: BlocBuilder<ResourceBloc, bloc_state.ResourceState>(
+          builder: (context, state) {
+            List<ResourceItem> items = [];
+            if (state is bloc_state.ResourceLoading && items.isEmpty) {
+              if (ResourceService.resources.isNotEmpty) {
+                items = ResourceService.resources;
+              } else {
+                return const Center(child: CircularProgressIndicator());
+              }
+            } else if (state is bloc_state.ResourceLoaded) {
+              items = state.items;
+            } else if (state is bloc_state.ResourceError) {
+              if (ResourceService.resources.isNotEmpty) {
+                items = ResourceService.resources;
+              } else {
+                return Center(child: Text('Error loading resources: ${state.message}'));
+              }
+            }
 
-          return ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: widget.color.withOpacity(0.1)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.folder_open_rounded, color: widget.color),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${widget.semester} Resources', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text('Academic Session ${widget.session}', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              if (sessionItems.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(64),
-                    child: Column(
-                      children: [
-                        Icon(Icons.cloud_off_rounded, size: 64, color: colors.onSurfaceVariant.withOpacity(0.2)),
-                        const SizedBox(height: 16),
-                        Text('No resources found', style: TextStyle(color: colors.onSurfaceVariant)),
-                      ],
-                    ),
+            final sessionItems = items.where((i) => i.session == widget.session && i.semester == widget.semester).toList();
+
+            return ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: widget.color.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: widget.color.withValues(alpha: 0.1)),
                   ),
-                ),
-              ...sessionItems.map((res) => Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: colors.outline.withOpacity(0.1)),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.insert_drive_file_rounded, color: Colors.redAccent),
-                  ),
-                  title: Text(res.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Text('Uploaded on ${res.date}', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Row(
                     children: [
-                      IconButton(
-                        icon: Icon(Icons.open_in_new_rounded, color: widget.color),
-                        onPressed: () {
-                          // Launch URL (requires url_launcher)
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening resource link...')));
-                        },
-                      ),
-                      ValueListenableBuilder<ProfileData>(
-                        valueListenable: currentProfile,
-                        builder: (context, profile, _) {
-                          if (profile.role == UserRole.committeeMember || profile.role == UserRole.superUser) {
-                            return Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent, size: 20),
-                                  onPressed: () => _showForm(context, existingItem: res),
-                                  tooltip: 'Update Details',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                  onPressed: () => _deleteItem(res),
-                                  tooltip: 'Delete File',
-                                ),
-                              ],
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
+                      Icon(Icons.folder_open_rounded, color: widget.color),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${widget.semester} Resources', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('Academic Session ${widget.session}', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              )),
-            ],
-          );
-        },
+                const SizedBox(height: 24),
+                if (sessionItems.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(64),
+                      child: Column(
+                        children: [
+                          Icon(Icons.cloud_off_rounded, size: 64, color: colors.onSurfaceVariant.withValues(alpha: 0.2)),
+                          const SizedBox(height: 16),
+                          Text('No resources found', style: TextStyle(color: colors.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ...sessionItems.map((res) => Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: colors.outline.withValues(alpha: 0.1)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.insert_drive_file_rounded, color: Colors.redAccent),
+                    ),
+                    title: Text(res.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text('Uploaded on ${res.date}', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.open_in_new_rounded, color: widget.color),
+                          onPressed: () {
+                            // Link open can be handled or launch URL
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening resource link...')));
+                          },
+                        ),
+                        ValueListenableBuilder<ProfileData>(
+                          valueListenable: currentProfile,
+                          builder: (context, profile, _) {
+                            if (profile.role == UserRole.committeeMember || profile.role == UserRole.superUser) {
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent, size: 20),
+                                    onPressed: () => _showForm(context, existingItem: res),
+                                    tooltip: 'Update Details',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                    onPressed: () => _deleteItem(res),
+                                    tooltip: 'Delete File',
+                                  ),
+                                ],
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+              ],
+            );
+          },
+        ),
       ),
       floatingActionButton: ValueListenableBuilder<ProfileData>(
         valueListenable: currentProfile,

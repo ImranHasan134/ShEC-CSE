@@ -86,6 +86,3 @@ class NoticeItem {
   }
 }
 
-// Global Notifiers for Notices
-final ValueNotifier<List<NoticeItem>> clubNoticesState = ValueNotifier([]);
-final ValueNotifier<List<NoticeItem>> deptNoticesState = ValueNotifier([]);

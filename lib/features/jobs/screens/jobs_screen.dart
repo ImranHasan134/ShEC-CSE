@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import '../models/job_state.dart';
+import '../presentation/bloc/job_bloc.dart';
+import '../presentation/bloc/job_event.dart';
+import '../presentation/bloc/job_state.dart' as bloc_state;
 import 'job_detail_screen.dart';
 import '../../../backend/services/job_service.dart';
 import 'package:intl/intl.dart';
@@ -17,26 +21,11 @@ class _JobsScreenState extends State<JobsScreen> {
   @override
   void initState() {
     super.initState();
-    JobService.fetchJobs();
+    context.read<JobBloc>().add(const FetchJobsRequested());
   }
 
-  void _toggleStar(JobItem job) async {
-    try {
-      job.isStarred = !job.isStarred;
-      jobsState.value = List.from(jobsState.value);
-      await JobService.updateJobInDB(job);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating star: $e')));
-    }
-  }
-
-  void _deleteJob(JobItem job) async {
-    try {
-      await JobService.deleteJobFromDB(job.id);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Job deleted')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting job: $e')));
-    }
+  void _toggleStar(JobItem job) {
+    context.read<JobBloc>().add(UpdateJobRequested(job: job.copyWith(isStarred: !job.isStarred)));
   }
 
   void _showJobForm(BuildContext context, {JobItem? existingJob}) {
@@ -188,35 +177,28 @@ class _JobsScreenState extends State<JobsScreen> {
                               width: double.infinity,
                               height: 56,
                               child: ElevatedButton(
-                                onPressed: () async {
+                                onPressed: () {
                                   if (!formKey.currentState!.validate()) return;
                                   
-                                  final messenger = ScaffoldMessenger.of(context);
                                   Navigator.pop(modalContext);
-                                  try {
-                                    final jobData = JobItem(
-                                      id: existingJob?.id ?? '',
-                                      company: companyController.text.trim(),
-                                      role: roleController.text.trim(),
-                                      location: locationController.text.trim(),
-                                      salary: salaryController.text.trim(),
-                                      deadline: deadlineController.text.trim(),
-                                      jobType: selectedJobType!,
-                                      description: descriptionController.text.trim(),
-                                      applyUrl: applyUrlController.text.trim(),
-                                      isVisible: isVisible,
-                                      createdByName: currentProfile.value.name,
-                                    );
-                                    
-                                    if (existingJob == null) {
-                                      await JobService.addJobToDB(jobData);
-                                      if (mounted) messenger.showSnackBar(const SnackBar(content: Text('Job posted successfully!')));
-                                    } else {
-                                      await JobService.updateJobInDB(jobData);
-                                      if (mounted) messenger.showSnackBar(const SnackBar(content: Text('Job updated successfully!')));
-                                    }
-                                  } catch (e) {
-                                    if (mounted) messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                                  final jobData = JobItem(
+                                    id: existingJob?.id ?? '',
+                                    company: companyController.text.trim(),
+                                    role: roleController.text.trim(),
+                                    location: locationController.text.trim(),
+                                    salary: salaryController.text.trim(),
+                                    deadline: deadlineController.text.trim(),
+                                    jobType: selectedJobType!,
+                                    description: descriptionController.text.trim(),
+                                    applyUrl: applyUrlController.text.trim(),
+                                    isVisible: isVisible,
+                                    createdByName: existingJob?.createdByName ?? currentProfile.value.name,
+                                  );
+                                  
+                                  if (existingJob == null) {
+                                    context.read<JobBloc>().add(AddJobRequested(job: jobData));
+                                  } else {
+                                    context.read<JobBloc>().add(UpdateJobRequested(job: jobData));
                                   }
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -274,28 +256,55 @@ class _JobsScreenState extends State<JobsScreen> {
       appBar: AppBar(
         title: const Text('Job Board'),
       ),
-      body: RefreshIndicator(
-        onRefresh: () => JobService.fetchJobs(),
-        child: ValueListenableBuilder<List<JobItem>>(
-          valueListenable: jobsState,
-          builder: (context, jobs, _) {
-            final profile = currentProfile.value;
-            final isAdmin = profile.role != UserRole.student;
-            final visibleJobs = jobs.where((j) {
-              if (isAdmin) return true;
-              return j.isApproved && j.isVisible;
-            }).toList();
-
-            if (visibleJobs.isEmpty) {
-              return const Center(child: Text('No jobs posted yet.'));
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: visibleJobs.length,
-              itemBuilder: (context, index) => _buildJobCard(visibleJobs[index]),
-            );
+      body: BlocListener<JobBloc, bloc_state.JobState>(
+        listener: (context, state) {
+          if (state is bloc_state.JobError) {
+            _showToast(context, state.message, isError: true);
+          } else if (state is bloc_state.JobOperationSuccess) {
+            _showToast(context, 'Operation successful!', isError: false);
+          }
+        },
+        child: RefreshIndicator(
+          onRefresh: () async {
+            context.read<JobBloc>().add(const FetchJobsRequested(forceRefresh: true));
           },
+          child: BlocBuilder<JobBloc, bloc_state.JobState>(
+            builder: (context, state) {
+              List<JobItem> jobs = [];
+              if (state is bloc_state.JobLoading && jobs.isEmpty) {
+                if (JobService.jobItems.isNotEmpty) {
+                  jobs = JobService.jobItems;
+                } else {
+                  return const Center(child: CircularProgressIndicator());
+                }
+              } else if (state is bloc_state.JobLoaded) {
+                jobs = state.items;
+              } else if (state is bloc_state.JobError) {
+                if (JobService.jobItems.isNotEmpty) {
+                  jobs = JobService.jobItems;
+                } else {
+                  return Center(child: Text('Error loading jobs: ${state.message}'));
+                }
+              }
+
+              final profile = currentProfile.value;
+              final isAdmin = profile.role != UserRole.student;
+              final visibleJobs = jobs.where((j) {
+                if (isAdmin) return true;
+                return j.isApproved && j.isVisible;
+              }).toList();
+
+              if (visibleJobs.isEmpty) {
+                return const Center(child: Text('No jobs posted yet.'));
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: visibleJobs.length,
+                itemBuilder: (context, index) => _buildJobCard(visibleJobs[index]),
+              );
+            },
+          ),
         ),
       ),
       floatingActionButton: ValueListenableBuilder<ProfileData>(
@@ -473,13 +482,8 @@ class _JobsScreenState extends State<JobsScreen> {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             tooltip: 'Approve Job',
-            onPressed: () async {
-              try {
-                await JobService.approveJob(job.id);
-                if (context.mounted) _showToast(context, 'Job approved successfully!', isError: false);
-              } catch (e) {
-                if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-              }
+            onPressed: () {
+              context.read<JobBloc>().add(ApproveJobRequested(itemId: job.id));
             },
           ),
           const SizedBox(width: 12),
@@ -489,13 +493,8 @@ class _JobsScreenState extends State<JobsScreen> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: job.isVisible ? 'Hide Job' : 'Show Job',
-          onPressed: () async {
-            try {
-              await JobService.toggleJobVisibility(job.id, !job.isVisible);
-              if (context.mounted) _showToast(context, job.isVisible ? 'Job hidden!' : 'Job is now visible!', isError: false);
-            } catch (e) {
-              if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-            }
+          onPressed: () {
+            context.read<JobBloc>().add(ToggleJobVisibilityRequested(itemId: job.id, isVisible: !job.isVisible));
           },
         ),
         const SizedBox(width: 12),
@@ -512,13 +511,8 @@ class _JobsScreenState extends State<JobsScreen> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: 'Delete Job',
-          onPressed: () async {
-            try {
-              await JobService.deleteJobFromDB(job.id);
-              if (context.mounted) _showToast(context, 'Job deleted successfully!', isError: false);
-            } catch (e) {
-              if (context.mounted) _showToast(context, 'Error: $e', isError: true);
-            }
+          onPressed: () {
+            context.read<JobBloc>().add(DeleteJobRequested(itemId: job.id));
           },
         ),
       ],

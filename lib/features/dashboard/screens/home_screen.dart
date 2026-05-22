@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ShEC_CSE/features/dashboard/models/quick_access_state.dart';
 import 'package:ShEC_CSE/features/cgpa_calculator/screens/cgpa_calculator_screen.dart';
 import 'package:ShEC_CSE/features/resources/screens/resources_screen.dart';
-import 'package:ShEC_CSE/features/department/screens/department_screen.dart';
+import 'package:ShEC_CSE/features/department/presentation/screens/department_screen.dart';
 import 'package:ShEC_CSE/features/club/screens/club_screen.dart';
 import 'package:ShEC_CSE/features/gallery/models/gallery_state.dart';
 import 'package:ShEC_CSE/backend/services/gallery_service.dart';
@@ -10,9 +10,19 @@ import 'package:ShEC_CSE/backend/services/notice_service.dart';
 import 'package:ShEC_CSE/backend/services/contest_service.dart';
 import 'package:ShEC_CSE/features/notices/models/notice_state.dart';
 import 'package:ShEC_CSE/features/contests/models/contest_state.dart';
+import 'package:ShEC_CSE/features/contests/presentation/bloc/contest_bloc.dart';
+import 'package:ShEC_CSE/features/contests/presentation/bloc/contest_event.dart';
+import 'package:ShEC_CSE/features/contests/presentation/bloc/contest_state.dart';
 import 'package:ShEC_CSE/features/gallery/screens/gallery_screen.dart';
 import 'package:ShEC_CSE/features/notices/widgets/notice_card.dart';
 import 'dart:async';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ShEC_CSE/features/notices/presentation/bloc/notice_bloc.dart';
+import 'package:ShEC_CSE/features/notices/presentation/bloc/notice_event.dart';
+import 'package:ShEC_CSE/features/notices/presentation/bloc/notice_state.dart';
+import 'package:ShEC_CSE/features/gallery/presentation/bloc/gallery_bloc.dart';
+import 'package:ShEC_CSE/features/gallery/presentation/bloc/gallery_event.dart';
+import 'package:ShEC_CSE/features/gallery/presentation/bloc/gallery_state.dart';
 
 import '../../jobs/screens/jobs_screen.dart';
 
@@ -36,9 +46,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    GalleryService.fetchGalleryItems();
-    NoticeService.fetchNotices();
-    ContestService.fetchContestsAndCourses();
+    context.read<GalleryBloc>().add(const FetchGalleryItemsRequested());
+    context.read<NoticeBloc>().add(const FetchNoticesRequested());
+    context.read<ContestBloc>().add(const FetchContestsRequested());
     _startCarouselTimer();
   }
 
@@ -51,7 +61,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _startCarouselTimer() {
     _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
-      final approvedCount = galleryState.value.where((item) => item.isApproved).length;
+      final state = context.read<GalleryBloc>().state;
+      final approvedCount = state is GalleryLoaded
+          ? state.items.where((item) => item.isApproved).length
+          : 0;
       if (_pageController.hasClients && approvedCount > 0) {
         _currentPage++;
         _pageController.animateToPage(
@@ -90,9 +103,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 24),
 
         // --- ANIMATED GALLERY CAROUSEL ---
-        ValueListenableBuilder<List<GalleryItem>>(
-          valueListenable: galleryState,
-          builder: (context, items, _) {
+        BlocBuilder<GalleryBloc, GalleryState>(
+          builder: (context, state) {
+            final items = state is GalleryLoaded ? state.items : <GalleryItem>[];
             final approvedItems = items.where((item) => item.isApproved).take(5).toList();
             if (approvedItems.isEmpty) return const SizedBox.shrink();
 
@@ -163,58 +176,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 32),
 
         _buildSectionHeader('Latest Notices', () => widget.onNavigateToTab?.call(1)),
-        ValueListenableBuilder<List<NoticeItem>>(
-          valueListenable: clubNoticesState,
-          builder: (context, clubNotices, _) {
-            return ValueListenableBuilder<List<NoticeItem>>(
-              valueListenable: deptNoticesState,
-              builder: (context, deptNotices, _) {
-                // Combine, sort by pinned first, then by date (latest first)
-                final allNotices = [...clubNotices, ...deptNotices];
-                final filtered = allNotices.where((n) => n.isApproved && n.isVisible).toList();
-                
-                // Sort: Pinned first, then by createdAt descending
-                filtered.sort((a, b) {
-                  if (a.isPinned && !b.isPinned) return -1;
-                  if (!a.isPinned && b.isPinned) return 1;
-                  
-                  // If both pinned or both unpinned, sort by date
-                  final dateA = a.createdAt ?? DateTime(2000);
-                  final dateB = b.createdAt ?? DateTime(2000);
-                  return dateB.compareTo(dateA);
-                });
+        BlocBuilder<NoticeBloc, NoticeState>(
+          builder: (context, state) {
+            if (state is NoticeLoading) {
+              return const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final clubNotices = state is NoticesLoaded ? state.clubNotices : <NoticeItem>[];
+            final deptNotices = state is NoticesLoaded ? state.deptNotices : <NoticeItem>[];
+            
+            // Combine, sort by pinned first, then by date (latest first)
+            final allNotices = [...clubNotices, ...deptNotices];
+            final filtered = allNotices.where((n) => n.isApproved && n.isVisible).toList();
+            
+            // Sort: Pinned first, then by createdAt descending
+            filtered.sort((a, b) {
+              if (a.isPinned && !b.isPinned) return -1;
+              if (!a.isPinned && b.isPinned) return 1;
+              
+              // If both pinned or both unpinned, sort by date
+              final dateA = a.createdAt ?? DateTime(2000);
+              final dateB = b.createdAt ?? DateTime(2000);
+              return dateB.compareTo(dateA);
+            });
 
-                final latest = filtered.take(3).toList();
-                
-                if (latest.isEmpty) return const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No recent notices')));
-                
-                return Column(
-                  children: latest.map((n) => NoticeCard(notice: n)).toList(),
-                );
-              },
+            final latest = filtered.take(3).toList();
+            
+            if (latest.isEmpty) return const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No recent notices')));
+            
+            return Column(
+              children: latest.map((n) => NoticeCard(notice: n)).toList(),
             );
           },
         ),
 
         const SizedBox(height: 24),
         _buildSectionHeader('Upcoming Contests', () => widget.onNavigateToTab?.call(3)),
-        ValueListenableBuilder<List<ContestItem>>(
-          valueListenable: contestState,
-          builder: (context, contests, _) {
-            final latest = contests.where((c) => c.isApproved && c.isVisible).take(2).toList();
-            if (latest.isEmpty) return const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming contests')));
-            return Column(
-              children: latest.map((c) => _buildListCard(
-                context, 
-                icon: Icons.emoji_events, 
-                iconColor: Colors.orange, 
-                title: c.title, 
-                subtitle: '${c.platform} | Level/Div: ${c.level}', 
-                tag: 'Contest', 
-                date: c.date,
-                onTap: () => widget.onNavigateToTab?.call(3),
-              )).toList(),
-            );
+        BlocBuilder<ContestBloc, ContestState>(
+          builder: (context, state) {
+            if (state is ContestLoading) {
+              return const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (state is ContestLoaded) {
+              final latest = state.items.where((c) => c.isApproved && c.isVisible).take(2).toList();
+              if (latest.isEmpty) return const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming contests')));
+              return Column(
+                children: latest.map((c) => _buildListCard(
+                  context, 
+                  icon: Icons.emoji_events, 
+                  iconColor: Colors.orange, 
+                  title: c.title, 
+                  subtitle: '${c.platform} | Level/Div: ${c.level}', 
+                  tag: 'Contest', 
+                  date: c.date,
+                  onTap: () => widget.onNavigateToTab?.call(3),
+                )).toList(),
+              );
+            }
+            return const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming contests')));
           },
         ),
       ],

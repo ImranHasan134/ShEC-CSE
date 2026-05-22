@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/alumni/models/alumni_state.dart';
@@ -6,12 +7,17 @@ import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
 import '../../core/services/storage_service.dart';
 
-
 class AlumniService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<AlumniItem> _alumniItems = [];
 
-  static Future<void> fetchAlumni({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.alumni)) return;
+  static final StreamController<List<AlumniItem>> _alumniStreamController = StreamController.broadcast();
+  static Stream<List<AlumniItem>> get alumniStream => _alumniStreamController.stream;
+
+  static List<AlumniItem> get alumniItems => _alumniItems;
+
+  static Future<List<AlumniItem>> fetchAlumni({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.alumni)) return _alumniItems;
 
     try {
       final isAdmin = currentProfile.value.role != UserRole.student;
@@ -20,11 +26,13 @@ class AlumniService {
         query = query.eq('is_approved', true).eq('is_visible', true);
       }
       final response = await query.order('created_at', ascending: false);
-      alumniState.value = (response as List).map((e) => AlumniItem.fromJson(e)).toList();
+      _alumniItems = (response as List).map((e) => AlumniItem.fromJson(e)).toList();
       CacheService.markFresh(CacheKeys.alumni);
+      _alumniStreamController.add(_alumniItems);
     } catch (e) {
       debugPrint('Error fetching alumni: $e');
     }
+    return _alumniItems;
   }
 
   static Future<void> addAlumni(AlumniItem item) async {
@@ -35,9 +43,11 @@ class AlumniService {
     data['is_approved'] = isSuperUser;
     data['created_by_name'] = profile.name;
 
-    await _client.from('alumni').insert(data);
+    final response = await _client.from('alumni').insert(data).select().single();
+    final newItem = AlumniItem.fromJson(response);
+    _alumniItems = List.from(_alumniItems)..insert(0, newItem);
+    _alumniStreamController.add(_alumniItems);
     CacheService.invalidate(CacheKeys.alumni);
-    await fetchAlumni(forceRefresh: true);
   }
 
   static Future<void> updateAlumni(AlumniItem item) async {
@@ -70,7 +80,8 @@ class AlumniService {
       // 2. Delete from DB
       await _client.from('alumni').delete().eq('id', alumni.id);
 
-      alumniState.value = alumniState.value.where((a) => a.id != alumni.id).toList();
+      _alumniItems = _alumniItems.where((a) => a.id != alumni.id).toList();
+      _alumniStreamController.add(_alumniItems);
       CacheService.invalidate(CacheKeys.alumni);
     } catch (e) {
       debugPrint('Error deleting alumni: $e');

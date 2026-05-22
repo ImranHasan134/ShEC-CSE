@@ -42,6 +42,3 @@ class ResourceItem {
     };
   }
 }
-
-// Global Notifier for Resources
-final ValueNotifier<List<ResourceItem>> resourceState = ValueNotifier([]);

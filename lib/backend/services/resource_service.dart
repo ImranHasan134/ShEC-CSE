@@ -1,25 +1,30 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/resources/models/resource_state.dart';
 import '../../core/services/cache_service.dart';
 
 class ResourceService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<ResourceItem> _resources = [];
 
-  static Future<void> fetchResources({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.resources)) return;
+  static final StreamController<List<ResourceItem>> _resourcesStreamController = StreamController.broadcast();
+  static Stream<List<ResourceItem>> get resourcesStream => _resourcesStreamController.stream;
+
+  static List<ResourceItem> get resources => _resources;
+
+  static Future<List<ResourceItem>> fetchResources({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.resources) && _resources.isNotEmpty) return _resources;
 
     final response = await _client
         .from('resources')
         .select()
         .order('created_at', ascending: false);
 
-    final List<ResourceItem> resources = [];
-    for (var row in response) {
-      resources.add(ResourceItem.fromJson(row));
-    }
+    _resources = (response as List).map((row) => ResourceItem.fromJson(row)).toList();
 
-    resourceState.value = resources;
+    _resourcesStreamController.add(_resources);
     CacheService.markFresh(CacheKeys.resources);
+    return _resources;
   }
 
   static Future<void> addResourceToDB(ResourceItem item) async {
@@ -31,7 +36,8 @@ class ResourceService {
         .single();
 
     final newItem = ResourceItem.fromJson(response);
-    resourceState.value = List.from(resourceState.value)..insert(0, newItem);
+    _resources = List.from(_resources)..insert(0, newItem);
+    _resourcesStreamController.add(_resources);
     CacheService.invalidate(CacheKeys.resources);
   }
 
@@ -41,6 +47,9 @@ class ResourceService {
         .from('resources')
         .update(data)
         .eq('id', item.id);
+    
+    _resources = _resources.map((i) => i.id == item.id ? item : i).toList();
+    _resourcesStreamController.add(_resources);
     CacheService.invalidate(CacheKeys.resources);
   }
 
@@ -50,7 +59,8 @@ class ResourceService {
         .delete()
         .eq('id', item.id);
 
-    resourceState.value = List.from(resourceState.value)..removeWhere((i) => i.id == item.id);
+    _resources = List.from(_resources)..removeWhere((i) => i.id == item.id);
+    _resourcesStreamController.add(_resources);
     CacheService.invalidate(CacheKeys.resources);
   }
 }

@@ -1,14 +1,18 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../backend/services/contributor_service.dart';
 import '../../../backend/services/auth_service.dart';
-import '../../../core/services/image_processing_service.dart';
 import '../../profile/models/profile_state.dart';
-import '../models/contributor_item.dart';
+import '../domain/entities/contributor_item.dart';
+import '../presentation/bloc/contributor_bloc.dart';
+import '../presentation/bloc/contributor_event.dart';
+import '../presentation/bloc/contributor_state.dart';
+import '../presentation/widgets/contributor_painters.dart';
+import '../presentation/widgets/tech_radar_avatar.dart';
+import '../presentation/widgets/pulsing_status_light.dart';
+import '../presentation/widgets/cyber_mainframe_header.dart';
+import '../presentation/widgets/add_edit_contributor_sheet.dart';
 
 class ContributorsScreen extends StatefulWidget {
   const ContributorsScreen({super.key});
@@ -18,24 +22,18 @@ class ContributorsScreen extends StatefulWidget {
 }
 
 class _ContributorsScreenState extends State<ContributorsScreen> {
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await ContributorService.fetchContributors();
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+  void _loadData() {
+    context.read<ContributorBloc>().add(const FetchContributorsRequested());
   }
 
   Future<void> _refresh() async {
-    await ContributorService.fetchContributors(forceRefresh: true);
+    context.read<ContributorBloc>().add(const FetchContributorsRequested(forceRefresh: true));
   }
 
   Future<void> _launchURL(String urlString) async {
@@ -63,7 +61,7 @@ class _ContributorsScreenState extends State<ContributorsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _AddEditContributorSheet(contributor: contributor),
+      builder: (context) => AddEditContributorSheet(contributor: contributor),
     );
   }
 
@@ -91,27 +89,8 @@ class _ContributorsScreenState extends State<ContributorsScreen> {
       },
     );
 
-    if (confirm == true) {
-      try {
-        await ContributorService.deleteContributor(contributor);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Contributor deleted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting contributor: $e'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
-      }
+    if (confirm == true && mounted) {
+      context.read<ContributorBloc>().add(DeleteContributorRequested(contributor));
     }
   }
 
@@ -357,12 +336,34 @@ class _ContributorsScreenState extends State<ContributorsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: ValueListenableBuilder<List<ContributorItem>>(
-          valueListenable: contributorsState,
-          builder: (context, contributors, _) {
-            if (_isLoading) {
+        child: BlocConsumer<ContributorBloc, ContributorState>(
+          listener: (context, state) {
+            if (state is ContributorError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            } else if (state is ContributorOperationSuccess) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          },
+          builder: (context, state) {
+            if (state is ContributorLoading || state is ContributorInitial) {
               return const Center(child: CircularProgressIndicator());
             }
+            
+            List<ContributorItem> contributors = [];
+            if (state is ContributorsLoaded) {
+              contributors = state.contributors;
+            }
+
             if (contributors.isEmpty) {
               return SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -384,6 +385,7 @@ class _ContributorsScreenState extends State<ContributorsScreen> {
                 ),
               );
             }
+            
             final isWide = MediaQuery.of(context).size.width > 600;
             if (isWide) {
               final leftCol = <ContributorItem>[];
@@ -663,804 +665,6 @@ class _ContributorsScreenState extends State<ContributorsScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _AddEditContributorSheet extends StatefulWidget {
-  final ContributorItem? contributor;
-
-  const _AddEditContributorSheet({super.key, this.contributor});
-
-  @override
-  State<_AddEditContributorSheet> createState() => _AddEditContributorSheetState();
-}
-
-class _AddEditContributorSheetState extends State<_AddEditContributorSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _roleController;
-  late TextEditingController _contributionController;
-  late TextEditingController _githubController;
-  late TextEditingController _linkedinController;
-
-  File? _imageFile;
-  String _imageUrl = '';
-  bool _isSaving = false;
-
-  List<ProfileData> _allMembers = [];
-  ProfileData? _selectedMember;
-  bool _isLoadingMembers = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final c = widget.contributor;
-    _nameController = TextEditingController(text: c?.name ?? '');
-    _roleController = TextEditingController(text: c?.role ?? '');
-    _contributionController = TextEditingController(text: c?.contribution ?? '');
-    _githubController = TextEditingController(text: c?.githubUrl ?? '');
-    _linkedinController = TextEditingController(text: c?.linkedinUrl ?? '');
-    _imageUrl = c?.imagePath ?? '';
-
-    _fetchClubMembers();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _roleController.dispose();
-    _contributionController.dispose();
-    _githubController.dispose();
-    _linkedinController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetchClubMembers() async {
-    setState(() => _isLoadingMembers = true);
-    try {
-      final members = await AuthService.fetchAllMembers();
-      setState(() {
-        _allMembers = members;
-      });
-    } catch (e) {
-      debugPrint('Error fetching members: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingMembers = false);
-      }
-    }
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    try {
-      final pickedFile = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 85,
-      );
-      if (pickedFile != null) {
-        if (!mounted) return;
-        final cropped = await ImageProcessingService.cropImage(
-          context,
-          File(pickedFile.path),
-          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        );
-        if (cropped != null) {
-          final processed = await ImageProcessingService.processAndConvert(cropped);
-          if (processed != null) {
-            setState(() {
-              _imageFile = processed;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isSaving = true);
-    try {
-      String finalImageUrl = _imageUrl;
-      if (_imageFile != null) {
-        final uploadedUrl = await ContributorService.uploadImage(_imageFile!);
-        if (uploadedUrl != null) {
-          finalImageUrl = uploadedUrl;
-        } else {
-          throw Exception('Image upload failed');
-        }
-      }
-
-      final item = ContributorItem(
-        id: widget.contributor?.id ?? '',
-        name: _nameController.text.trim(),
-        role: _roleController.text.trim(),
-        contribution: _contributionController.text.trim(),
-        githubUrl: _githubController.text.trim(),
-        linkedinUrl: _linkedinController.text.trim(),
-        imagePath: finalImageUrl,
-      );
-
-      if (widget.contributor == null) {
-        await ContributorService.addContributor(item);
-      } else {
-        await ContributorService.updateContributor(item);
-      }
-
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.contributor == null
-                  ? 'Contributor added successfully!'
-                  : 'Contributor updated successfully!',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving contributor: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      padding: EdgeInsets.fromLTRB(24, 12, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handlebar
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: colors.onSurfaceVariant.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Text(
-                widget.contributor == null ? 'Add Contributor' : 'Edit Contributor',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              // Image Picker Avatar
-              GestureDetector(
-                onTap: _pickImage,
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 54,
-                      backgroundColor: colors.primary.withOpacity(0.1),
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage: _imageFile != null
-                            ? FileImage(_imageFile!) as ImageProvider
-                            : (_imageUrl.isNotEmpty && _imageUrl.startsWith('http')
-                                ? NetworkImage(_imageUrl) as ImageProvider
-                                : null),
-                        child: _imageFile == null && (_imageUrl.isEmpty || !_imageUrl.startsWith('http'))
-                            ? Icon(Icons.add_a_photo_outlined, size: 36, color: colors.primary)
-                            : null,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: colors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.edit, size: 16, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // Link Existing Club Member Dropdown (Only for adding new contributor)
-              if (widget.contributor == null) ...[
-                if (_isLoadingMembers)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.0),
-                    child: Center(
-                      child: SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  )
-                else if (_allMembers.isNotEmpty) ...[
-                  DropdownButtonFormField<ProfileData>(
-                    value: _selectedMember,
-                    decoration: InputDecoration(
-                      labelText: 'Link Existing Club Member (Optional)',
-                      prefixIcon: const Icon(Icons.person_search),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    items: _allMembers.map((member) {
-                      return DropdownMenuItem<ProfileData>(
-                        value: member,
-                        child: Text(
-                          '${member.name} (${member.designation})',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (member) {
-                      if (member != null) {
-                        setState(() {
-                          _selectedMember = member;
-                          _nameController.text = member.name;
-                          _roleController.text = member.designation;
-                          _imageUrl = member.imagePath ?? '';
-                          _imageFile = null; // clear picked image to show network image
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ],
-
-              // Form Fields
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Name *',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _roleController,
-                decoration: InputDecoration(
-                  labelText: 'Role (e.g. Lead Developer) *',
-                  prefixIcon: const Icon(Icons.work_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Role is required' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contributionController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Contribution Description',
-                  prefixIcon: const Icon(Icons.description_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _githubController,
-                decoration: InputDecoration(
-                  labelText: 'GitHub Profile URL',
-                  prefixIcon: const Icon(Icons.code_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _linkedinController,
-                decoration: InputDecoration(
-                  labelText: 'LinkedIn Profile URL',
-                  prefixIcon: const Icon(Icons.link_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: colors.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                        )
-                      : const Text('Save Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class GithubPainter extends CustomPainter {
-  final Color color;
-  GithubPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    
-    final path = Path();
-    final w = size.width;
-    final h = size.height;
-    
-    path.moveTo(w * 0.5, 0);
-    path.cubicTo(w * 0.22, 0, 0, h * 0.22, 0, h * 0.5);
-    path.cubicTo(0, h * 0.72, w * 0.14, h * 0.91, w * 0.34, h * 0.98);
-    path.cubicTo(w * 0.37, h * 0.98, w * 0.38, h * 0.97, w * 0.38, h * 0.95);
-    path.lineTo(w * 0.38, h * 0.83);
-    path.cubicTo(w * 0.24, h * 0.86, w * 0.21, h * 0.77, w * 0.21, h * 0.77);
-    path.cubicTo(w * 0.19, h * 0.71, w * 0.16, h * 0.69, w * 0.16, h * 0.69);
-    path.cubicTo(w * 0.11, h * 0.66, w * 0.16, h * 0.66, w * 0.16, h * 0.66);
-    path.cubicTo(w * 0.21, h * 0.66, w * 0.24, h * 0.71, w * 0.24, h * 0.71);
-    path.cubicTo(w * 0.28, h * 0.78, w * 0.35, h * 0.76, w * 0.38, h * 0.75);
-    path.cubicTo(w * 0.39, h * 0.71, w * 0.41, h * 0.68, w * 0.42, h * 0.66);
-    path.cubicTo(w * 0.31, h * 0.65, w * 0.19, h * 0.60, w * 0.19, h * 0.41);
-    path.cubicTo(w * 0.19, h * 0.35, w * 0.21, h * 0.31, w * 0.24, h * 0.27);
-    path.cubicTo(w * 0.23, h * 0.26, w * 0.21, h * 0.20, w * 0.25, h * 0.12);
-    path.cubicTo(w * 0.25, h * 0.12, w * 0.29, h * 0.10, w * 0.38, h * 0.17);
-    path.cubicTo(w * 0.42, h * 0.16, w * 0.46, h * 0.15, w * 0.50, h * 0.15);
-    path.cubicTo(w * 0.54, h * 0.15, w * 0.58, h * 0.16, w * 0.58, h * 0.17);
-    path.cubicTo(w * 0.71, h * 0.10, w * 0.75, h * 0.12, w * 0.75, h * 0.12);
-    path.cubicTo(w * 0.79, h * 0.20, w * 0.77, h * 0.26, w * 0.76, h * 0.27);
-    path.cubicTo(w * 0.79, h * 0.31, w * 0.81, h * 0.35, w * 0.81, h * 0.41);
-    path.cubicTo(w * 0.81, h * 0.60, w * 0.69, h * 0.65, w * 0.58, h * 0.66);
-    path.cubicTo(w * 0.60, h * 0.68, w * 0.62, h * 0.71, w * 0.62, h * 0.76);
-    path.lineTo(w * 0.62, h * 0.95);
-    path.cubicTo(w * 0.62, h * 0.97, w * 0.63, h * 0.98, w * 0.66, h * 0.98);
-    path.cubicTo(w * 0.86, h * 0.91, w * 1.00, h * 0.72, w * 1.00, h * 0.50);
-    path.cubicTo(w * 1.00, h * 0.22, w * 0.78, 0, w * 0.50, 0);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class LinkedInPainter extends CustomPainter {
-  final Color color;
-  LinkedInPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    // Draw rounded background square
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, w, h),
-      Radius.circular(w * 0.2),
-    );
-    canvas.drawRRect(rect, paint);
-
-    // Draw the "i" and "n" in white
-    final textPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    // Draw dot of 'i'
-    canvas.drawOval(
-      Rect.fromCircle(center: Offset(w * 0.29, h * 0.26), radius: w * 0.06),
-      textPaint,
-    );
-    // Draw body of 'i'
-    canvas.drawRect(
-      Rect.fromLTWH(w * 0.23, h * 0.38, w * 0.12, h * 0.42),
-      textPaint,
-    );
-
-    // Draw 'n' body and arch
-    final nPath = Path();
-    nPath.moveTo(w * 0.44, h * 0.38);
-    nPath.lineTo(w * 0.55, h * 0.38);
-    nPath.lineTo(w * 0.55, h * 0.45);
-    nPath.cubicTo(
-      w * 0.60, h * 0.36,
-      w * 0.74, h * 0.36,
-      w * 0.74, h * 0.52,
-    );
-    nPath.lineTo(w * 0.74, h * 0.8);
-    nPath.lineTo(w * 0.63, h * 0.8);
-    nPath.lineTo(w * 0.63, h * 0.55);
-    nPath.cubicTo(
-      w * 0.63, h * 0.48,
-      w * 0.59, h * 0.48,
-      w * 0.55, h * 0.52,
-    );
-    nPath.lineTo(w * 0.55, h * 0.8);
-    nPath.lineTo(w * 0.44, h * 0.8);
-    nPath.close();
-
-    canvas.drawPath(nPath, textPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class HUDCornerPainter extends CustomPainter {
-  final Color color;
-  HUDCornerPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final w = size.width;
-    final h = size.height;
-    const len = 12.0;
-    const offset = 1.0;
-
-    // Top-Left
-    canvas.drawLine(const Offset(offset, offset + len), const Offset(offset, offset), paint);
-    canvas.drawLine(const Offset(offset, offset), const Offset(offset + len, offset), paint);
-
-    // Top-Right
-    canvas.drawLine(Offset(w - offset - len, offset), Offset(w - offset, offset), paint);
-    canvas.drawLine(Offset(w - offset, offset), Offset(w - offset, offset + len), paint);
-
-    // Bottom-Left
-    canvas.drawLine(Offset(offset, h - offset - len), Offset(offset, h - offset), paint);
-    canvas.drawLine(Offset(offset, h - offset), Offset(offset + len, h - offset), paint);
-
-    // Bottom-Right
-    canvas.drawLine(Offset(w - offset - len, h - offset), Offset(w - offset, h - offset), paint);
-    canvas.drawLine(Offset(w - offset, h - offset - len), Offset(w - offset, h - offset), paint);
-
-    // Small cyber circle in corner
-    final dotPaint = Paint()
-      ..color = color.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(w - 8, 8), 2.0, dotPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class CyberMainframeHeader extends StatefulWidget {
-  final List<ContributorItem> contributors;
-  final Widget Function(BuildContext, List<ContributorItem>) builder;
-
-  const CyberMainframeHeader({
-    super.key,
-    required this.contributors,
-    required this.builder,
-  });
-
-  @override
-  State<CyberMainframeHeader> createState() => _CyberMainframeHeaderState();
-}
-
-class _CyberMainframeHeaderState extends State<CyberMainframeHeader> with SingleTickerProviderStateMixin {
-  late AnimationController _sweepController;
-
-  @override
-  void initState() {
-    super.initState();
-    _sweepController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _sweepController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Stack(
-      children: [
-        widget.builder(context, widget.contributors),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedBuilder(
-              animation: _sweepController,
-              builder: (context, child) {
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: CustomPaint(
-                    painter: ScanlinePainter(
-                      progress: _sweepController.value,
-                      color: colors.primary,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class ScanlinePainter extends CustomPainter {
-  final double progress;
-  final Color color;
-
-  ScanlinePainter({required this.progress, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final y = h * progress;
-
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          color.withOpacity(0.04),
-          color.withOpacity(0.18),
-          color.withOpacity(0.04),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
-      ).createShader(Rect.fromLTWH(0, y - 25, w, 50));
-
-    canvas.drawRect(Rect.fromLTWH(0, y - 25, w, 50), paint);
-
-    final linePaint = Paint()
-      ..color = color.withOpacity(0.4)
-      ..strokeWidth = 1.0;
-    canvas.drawLine(Offset(0, y), Offset(w, y), linePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant ScanlinePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
-  }
-}
-
-class TechRadarAvatar extends StatefulWidget {
-  final String imagePath;
-  final String name;
-  final Color themeColor;
-  final double radius;
-
-  const TechRadarAvatar({
-    key,
-    required this.imagePath,
-    required this.name,
-    required this.themeColor,
-    this.radius = 36,
-  }) : super(key: key);
-
-  @override
-  State<TechRadarAvatar> createState() => _TechRadarAvatarState();
-}
-
-class _TechRadarAvatarState extends State<TechRadarAvatar> with SingleTickerProviderStateMixin {
-  late AnimationController _rotationController;
-
-  @override
-  void initState() {
-    super.initState();
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _rotationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        AnimatedBuilder(
-          animation: _rotationController,
-          builder: (context, child) {
-            return Transform.rotate(
-              angle: _rotationController.value * 2 * 3.141592653589793,
-              child: CustomPaint(
-                size: Size((widget.radius + 6) * 2, (widget.radius + 6) * 2),
-                painter: RadarRingPainter(widget.themeColor),
-              ),
-            );
-          },
-        ),
-        CircleAvatar(
-          radius: widget.radius,
-          backgroundColor: colors.surface,
-          child: CircleAvatar(
-            radius: widget.radius - 2,
-            backgroundImage: widget.imagePath.isNotEmpty && widget.imagePath.startsWith('http')
-                ? NetworkImage(widget.imagePath)
-                : null,
-            child: (widget.imagePath.isEmpty || !widget.imagePath.startsWith('http'))
-                ? Text(
-                    widget.name.isNotEmpty ? widget.name[0].toUpperCase() : 'C',
-                    style: TextStyle(
-                      fontSize: widget.radius * 0.7,
-                      fontWeight: FontWeight.bold,
-                      color: widget.themeColor,
-                    ),
-                  )
-                : null,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class RadarRingPainter extends CustomPainter {
-  final Color color;
-  RadarRingPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withOpacity(0.35)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    final w = size.width;
-    final h = size.height;
-    final radius = w / 2;
-
-    canvas.drawCircle(Offset(radius, radius), radius - 2, paint);
-
-    final notchPaint = Paint()
-      ..color = color
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    path.addArc(
-      Rect.fromCircle(center: Offset(radius, radius), radius: radius - 2),
-      0,
-      0.6,
-    );
-    path.addArc(
-      Rect.fromCircle(center: Offset(radius, radius), radius: radius - 2),
-      2.09,
-      0.6,
-    );
-    path.addArc(
-      Rect.fromCircle(center: Offset(radius, radius), radius: radius - 2),
-      4.18,
-      0.6,
-    );
-    canvas.drawPath(path, notchPaint);
-
-    final finePaint = Paint()
-      ..color = color.withOpacity(0.12)
-      ..strokeWidth = 0.8
-      ..style = PaintingStyle.stroke;
-    canvas.drawCircle(Offset(radius, radius), radius + 2, finePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class PulsingStatusLight extends StatefulWidget {
-  final Color color;
-  const PulsingStatusLight({key, required this.color}) : super(key: key);
-
-  @override
-  State<PulsingStatusLight> createState() => _PulsingStatusLightState();
-}
-
-class _PulsingStatusLightState extends State<PulsingStatusLight> with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _glowAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-
-    _glowAnimation = Tween<double>(begin: 2.0, end: 7.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _glowAnimation,
-      builder: (context, child) {
-        return Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: widget.color,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: widget.color.withOpacity(0.6),
-                blurRadius: _glowAnimation.value,
-                spreadRadius: _glowAnimation.value / 4,
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

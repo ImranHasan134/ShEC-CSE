@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/notices/models/notice_state.dart';
@@ -9,9 +10,19 @@ import 'package:ShEC_CSE/backend/services/notification_service.dart';
 
 class NoticeService {
   static final SupabaseClient _client = Supabase.instance.client;
+  static List<NoticeItem> _clubNotices = [];
+  static List<NoticeItem> _deptNotices = [];
 
-  static Future<void> fetchNotices({bool forceRefresh = false}) async {
-    if (!forceRefresh && !CacheService.isStale(CacheKeys.notices)) return;
+  static final StreamController<({List<NoticeItem> club, List<NoticeItem> dept})> _noticesStreamController = StreamController.broadcast();
+  static Stream<({List<NoticeItem> club, List<NoticeItem> dept})> get noticesStream => _noticesStreamController.stream;
+
+  static List<NoticeItem> get clubNotices => _clubNotices;
+  static List<NoticeItem> get deptNotices => _deptNotices;
+
+  static Future<({List<NoticeItem> club, List<NoticeItem> dept})> fetchNotices({bool forceRefresh = false}) async {
+    if (!forceRefresh && !CacheService.isStale(CacheKeys.notices)) {
+      return (club: _clubNotices, dept: _deptNotices);
+    }
 
     final profile = currentProfile.value;
     final isAdmin = profile.role != UserRole.student;
@@ -24,21 +35,24 @@ class NoticeService {
     
     final response = await query.order('created_at', ascending: false);
 
-    final List<NoticeItem> clubNotices = [];
-    final List<NoticeItem> deptNotices = [];
+    final List<NoticeItem> clubList = [];
+    final List<NoticeItem> deptList = [];
 
     for (var row in response) {
       final item = NoticeItem.fromJson(row);
       if (row['category'] == 'club') {
-        clubNotices.add(item);
+        clubList.add(item);
       } else {
-        deptNotices.add(item);
+        deptList.add(item);
       }
     }
 
-    clubNoticesState.value = clubNotices;
-    deptNoticesState.value = deptNotices;
+    _clubNotices = clubList;
+    _deptNotices = deptList;
     CacheService.markFresh(CacheKeys.notices);
+    final result = (club: _clubNotices, dept: _deptNotices);
+    _noticesStreamController.add(result);
+    return result;
   }
 
   static Future<String?> uploadImage(File file) async {
@@ -73,11 +87,12 @@ class NoticeService {
 
       final newItem = NoticeItem.fromJson(response);
       if (category == 'club') {
-        clubNoticesState.value = List.from(clubNoticesState.value)..insert(0, newItem);
+        _clubNotices = List.from(_clubNotices)..insert(0, newItem);
       } else {
-        deptNoticesState.value = List.from(deptNoticesState.value)..insert(0, newItem);
+        _deptNotices = List.from(_deptNotices)..insert(0, newItem);
       }
       CacheService.invalidate(CacheKeys.notices);
+      _noticesStreamController.add((club: _clubNotices, dept: _deptNotices));
     } catch (e) {
       debugPrint('Error inserting notice: $e');
       rethrow;
@@ -125,11 +140,12 @@ class NoticeService {
       await _client.from('notices').delete().eq('id', notice.id);
       
       if (category == 'club') {
-        clubNoticesState.value = List.from(clubNoticesState.value)..removeWhere((n) => n.id == notice.id);
+        _clubNotices = List.from(_clubNotices)..removeWhere((n) => n.id == notice.id);
       } else {
-        deptNoticesState.value = List.from(deptNoticesState.value)..removeWhere((n) => n.id == notice.id);
+        _deptNotices = List.from(_deptNotices)..removeWhere((n) => n.id == notice.id);
       }
       CacheService.invalidate(CacheKeys.notices);
+      _noticesStreamController.add((club: _clubNotices, dept: _deptNotices));
     } catch (e) {
       debugPrint('Error deleting notice and image: $e');
       rethrow;

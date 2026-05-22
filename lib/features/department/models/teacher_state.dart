@@ -74,6 +74,3 @@ class TeacherContact {
     };
   }
 }
-
-// Global Notifier
-final ValueNotifier<List<TeacherContact>> teachersState = ValueNotifier([]);

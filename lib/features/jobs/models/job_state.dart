@@ -100,5 +100,3 @@ class JobItem {
   }
 }
 
-// Global Notifier for Jobs
-final ValueNotifier<List<JobItem>> jobsState = ValueNotifier([]);

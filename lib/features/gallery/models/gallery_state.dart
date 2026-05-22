@@ -58,5 +58,3 @@ class GalleryItem {
   }
 }
 
-// Global Notifier for Gallery Items
-final ValueNotifier<List<GalleryItem>> galleryState = ValueNotifier([]);
