@@ -11,28 +11,54 @@ class ImageProcessingService {
   static Future<File?> cropImage(BuildContext context, File imageFile, {CropAspectRatio? aspectRatio}) async {
     final colors = Theme.of(context).colorScheme;
     
-    final croppedFile = await ImageCropper().cropImage(
-      sourcePath: imageFile.path,
-      aspectRatio: aspectRatio,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Edit Image',
-          toolbarColor: colors.primary,
-          toolbarWidgetColor: Colors.white,
-          initAspectRatio: CropAspectRatioPreset.original,
-          lockAspectRatio: false,
-          activeControlsWidgetColor: colors.secondary,
-        ),
-        IOSUiSettings(
-          title: 'Edit Image',
-        ),
-      ],
-    );
-    
-    if (croppedFile != null) {
-      return File(croppedFile.path);
+    if (!await imageFile.exists()) {
+      debugPrint('ImageProcessingService.cropImage: input file does not exist.');
+      return null;
     }
-    return null;
+
+    File localFile = imageFile;
+    bool isTemporaryCopy = false;
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempPath = p.join(tempDir.path, "crop_input_${DateTime.now().millisecondsSinceEpoch}${p.extension(imageFile.path)}");
+      localFile = await imageFile.copy(tempPath);
+      isTemporaryCopy = true;
+    } catch (e) {
+      debugPrint('Failed to copy file to temp directory before cropping: $e');
+    }
+
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: localFile.path,
+        aspectRatio: aspectRatio,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Edit Image',
+            toolbarColor: colors.primary,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            activeControlsWidgetColor: colors.secondary,
+          ),
+          IOSUiSettings(
+            title: 'Edit Image',
+          ),
+        ],
+      );
+      
+      if (croppedFile != null) {
+        return File(croppedFile.path);
+      }
+      return null;
+    } finally {
+      if (isTemporaryCopy) {
+        try {
+          await localFile.delete();
+        } catch (e) {
+          debugPrint('Failed to delete temporary crop input file: $e');
+        }
+      }
+    }
   }
 
   /// Compress image and convert to WebP
