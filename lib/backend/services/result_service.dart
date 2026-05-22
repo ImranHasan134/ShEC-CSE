@@ -17,10 +17,10 @@ class ResultService {
 
     try {
       debugPrint('Loading results for user ID: ${profile.id}');
-      // Fetch all exam summaries for the user
+      // Fetch results and matching subject_results in a single query
       final resultsResponse = await _client
           .from('results')
-          .select()
+          .select('*, subject_results(*)')
           .eq('user_id', profile.id)
           .order('created_at', ascending: false);
       
@@ -29,16 +29,9 @@ class ResultService {
       final List<ExamResult> examResults = [];
 
       for (var resultRow in resultsResponse) {
-        final resultId = resultRow['id'];
-        
-        // Fetch subjects for this specific exam
-        final subjectsResponse = await _client
-            .from('subject_results')
-            .select()
-            .eq('result_id', resultId);
-        
-        final List<SubjectResult> subjects = (subjectsResponse as List)
-            .map((s) => SubjectResult.fromJson(s))
+        final List<dynamic> subjectsRaw = resultRow['subject_results'] ?? [];
+        final List<SubjectResult> subjects = subjectsRaw
+            .map((s) => SubjectResult.fromJson(s as Map<String, dynamic>))
             .toList();
 
         examResults.add(ExamResult.fromDB(resultRow, subjects));

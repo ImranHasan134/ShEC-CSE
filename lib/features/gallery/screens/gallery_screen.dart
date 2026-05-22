@@ -68,6 +68,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 if (cropped != null) {
                   // 2. Compress and Convert to WebP
                   final processed = await ImageProcessingService.processAndConvert(cropped);
+                  // Delete the intermediate cropped file since we now have the compressed WebP file
+                  _deleteLocalFileSilently(cropped);
+                  
                   if (processed != null) {
                     setModalState(() => mediaList.add(processed));
                   }
@@ -187,6 +190,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                     right: 4,
                                     child: GestureDetector(
                                       onTap: () {
+                                        final removedItem = mediaList[index];
+                                        if (removedItem is File) {
+                                          _deleteLocalFileSilently(removedItem);
+                                        }
                                         setModalState(() {
                                           mediaList.removeAt(index);
                                         });
@@ -252,6 +259,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                     final url = await GalleryService.uploadImage(media);
                                     if (url != null && url.isNotEmpty) {
                                       finalUrls.add(url);
+                                      _deleteLocalFileSilently(media);
                                     } else {
                                       throw Exception('Image upload failed');
                                     }
@@ -304,7 +312,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
           },
         );
       },
-    );
+    ).then((_) {
+      // Clean up any remaining cached files in mediaList if dismissed or cancelled
+      for (final item in mediaList) {
+        if (item is File) {
+          _deleteLocalFileSilently(item);
+        }
+      }
+    });
   }
 
   @override
@@ -562,6 +577,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ],
       ),
     );
+  }
+
+  void _deleteLocalFileSilently(File file) {
+    try {
+      if (file.existsSync()) {
+        file.deleteSync();
+        debugPrint('Temporary cache file deleted: ${file.path}');
+      }
+    } catch (e) {
+      debugPrint('Error deleting cached file: $e');
+    }
   }
 
   void _showToast(BuildContext context, String message, {required bool isError}) {

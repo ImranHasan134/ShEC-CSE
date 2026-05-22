@@ -72,6 +72,11 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Unsubscribe from services to prevent memory leaks and duplicate notifications
+    NoticeService.unsubscribeFromNotices();
+    JobService.unsubscribeFromJobs();
+    ContestService.unsubscribeFromContests();
+    ChatService.unsubscribeFromMessages();
     super.dispose();
   }
 

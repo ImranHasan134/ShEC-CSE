@@ -80,9 +80,15 @@ class JobService {
     CacheService.invalidate(CacheKeys.jobsRecommended);
   }
 
+  static RealtimeChannel? _jobChannel;
+
   // Real-time subscription
   static void subscribeToJobs() {
-    _client
+    if (_jobChannel != null) {
+      return;
+    }
+
+    _jobChannel = _client
       .channel('public:jobs')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
@@ -102,7 +108,19 @@ class JobService {
           }
           fetchJobs(forceRefresh: true);
         },
-      )
-      .subscribe();
+      );
+    
+    _jobChannel!.subscribe();
+  }
+
+  static Future<void> unsubscribeFromJobs() async {
+    if (_jobChannel != null) {
+      try {
+        await _client.removeChannel(_jobChannel!);
+      } catch (e) {
+        // Silently ignore
+      }
+      _jobChannel = null;
+    }
   }
 }

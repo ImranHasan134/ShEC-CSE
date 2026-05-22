@@ -40,13 +40,14 @@ class ResultScraperService {
           .eq('session', session);
       final List<Map<String, dynamic>> exams = List<Map<String, dynamic>>.from(examsData);
 
-      // 3. Iterate through exams and scrape
-      for (var exam in exams) {
+      // 3. Perform concurrent scraping tasks
+      final List<Future<void>> scrapingTasks = exams.map((exam) {
         final String examId = exam['exam_id'];
         final String examName = exam['exam_name'];
-        
-        await _scrapeSingleExam(userId, regNo, examId, sessId, examName);
-      }
+        return _scrapeSingleExam(userId, regNo, examId, sessId, examName);
+      }).toList();
+
+      await Future.wait(scrapingTasks);
       
       debugPrint('Finished scraping all results for user: $userId');
     } catch (e) {

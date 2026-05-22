@@ -86,9 +86,15 @@ class ContestService {
     CacheService.invalidate(CacheKeys.contests);
   }
 
+  static RealtimeChannel? _contestChannel;
+
   // Real-time subscription
   static void subscribeToContests() {
-    _client
+    if (_contestChannel != null) {
+      return;
+    }
+
+    _contestChannel = _client
       .channel('public:contests')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
@@ -108,7 +114,19 @@ class ContestService {
           }
           fetchContestsAndCourses(forceRefresh: true);
         },
-      )
-      .subscribe();
+      );
+    
+    _contestChannel!.subscribe();
+  }
+
+  static Future<void> unsubscribeFromContests() async {
+    if (_contestChannel != null) {
+      try {
+        await _client.removeChannel(_contestChannel!);
+      } catch (e) {
+        // Silently ignore
+      }
+      _contestChannel = null;
+    }
   }
 }

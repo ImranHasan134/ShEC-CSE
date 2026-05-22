@@ -80,10 +80,23 @@ class AlumniService {
 
   /// Promote a club member to alumni (superuser only)
   static Future<void> promoteToAlumni(String memberId, AlumniItem alumniData) async {
-    // Insert into alumni table
-    await addAlumni(alumniData);
-    // Mark profile as alumni
-    await _client.from('profiles').update({'is_alumni': true}).eq('id', memberId);
+    try {
+      // 1. Insert into alumni table
+      await addAlumni(alumniData);
+      
+      try {
+        // 2. Mark profile as alumni
+        await _client.from('profiles').update({'is_alumni': true}).eq('id', memberId);
+      } catch (e) {
+        // Rollback: if profile update fails, delete the inserted alumni record to prevent corrupt state
+        debugPrint('Failed to update profile to alumni. Rolling back alumni insertion...');
+        await _client.from('alumni').delete().eq('email', alumniData.email);
+        rethrow;
+      }
+    } catch (e) {
+      debugPrint('Error promoting member to alumni: $e');
+      rethrow;
+    }
   }
 
   static Future<String?> uploadImage(File file) async {

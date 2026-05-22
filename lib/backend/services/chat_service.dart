@@ -84,12 +84,15 @@ class ChatService {
     }
   }
 
+  static RealtimeChannel? _globalMessagesChannel;
+
   // Global subscription for background notifications
   static void subscribeToAllMessages() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
+    if (_globalMessagesChannel != null) return;
 
-    _client
+    _globalMessagesChannel = _client
       .channel('global_messages')
       .onPostgresChanges(
         event: PostgresChangeEvent.insert,
@@ -118,7 +121,19 @@ class ChatService {
             );
           }
         },
-      )
-      .subscribe();
+      );
+    
+    _globalMessagesChannel!.subscribe();
+  }
+
+  static Future<void> unsubscribeFromMessages() async {
+    if (_globalMessagesChannel != null) {
+      try {
+        await _client.removeChannel(_globalMessagesChannel!);
+      } catch (e) {
+        // Silently ignore
+      }
+      _globalMessagesChannel = null;
+    }
   }
 }

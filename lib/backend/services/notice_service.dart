@@ -148,8 +148,15 @@ class NoticeService {
     fetchNotices(forceRefresh: true);
   }
 
+  static RealtimeChannel? _noticeChannel;
+
   static void subscribeToNotices() {
-    _client
+    if (_noticeChannel != null) {
+      debugPrint('Already subscribed to notices channel, skipping duplicate subscription.');
+      return;
+    }
+
+    _noticeChannel = _client
       .channel('public:notices')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
@@ -170,7 +177,20 @@ class NoticeService {
           }
           fetchNotices(forceRefresh: true);
         },
-      )
-      .subscribe();
+      );
+    
+    _noticeChannel!.subscribe();
+  }
+
+  static Future<void> unsubscribeFromNotices() async {
+    if (_noticeChannel != null) {
+      debugPrint('Unsubscribing from notices channel...');
+      try {
+        await _client.removeChannel(_noticeChannel!);
+      } catch (e) {
+        debugPrint('Error removing notices channel: $e');
+      }
+      _noticeChannel = null;
+    }
   }
 }
