@@ -10,6 +10,7 @@ enum AppColorTheme {
   green,
   amber,
   crimson,
+  custom,
 }
 
 class ThemeService extends ChangeNotifier {
@@ -22,9 +23,11 @@ class ThemeService extends ChangeNotifier {
 
   AppThemeMode _themeMode = AppThemeMode.system;
   AppColorTheme _colorTheme = AppColorTheme.teal;
+  int _customColorValue = 0xFF00ADB5;
 
   AppThemeMode get themeMode => _themeMode;
   AppColorTheme get colorTheme => _colorTheme;
+  int get customColorValue => _customColorValue;
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -46,6 +49,8 @@ class ThemeService extends ChangeNotifier {
       );
     }
 
+    _customColorValue = _prefs.getInt('custom_color_value') ?? 0xFF00ADB5;
+
     _isInitialized = true;
     notifyListeners();
   }
@@ -62,6 +67,14 @@ class ThemeService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setCustomColorValue(int value) async {
+    _customColorValue = value;
+    await _prefs.setInt('custom_color_value', value);
+    if (_colorTheme == AppColorTheme.custom) {
+      notifyListeners();
+    }
+  }
+
   Color get primaryColor {
     switch (_colorTheme) {
       case AppColorTheme.teal:
@@ -76,6 +89,8 @@ class ThemeService extends ChangeNotifier {
         return const Color(0xFFFFB300);
       case AppColorTheme.crimson:
         return const Color(0xFFE53935);
+      case AppColorTheme.custom:
+        return Color(_customColorValue);
     }
   }
 
@@ -93,6 +108,8 @@ class ThemeService extends ChangeNotifier {
         return 'Amber';
       case AppColorTheme.crimson:
         return 'Crimson';
+      case AppColorTheme.custom:
+        return 'Custom';
     }
   }
 
