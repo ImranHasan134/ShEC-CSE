@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 class DepartmentScreen extends StatelessWidget {
   const DepartmentScreen({super.key});
@@ -13,11 +14,15 @@ class DepartmentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('CSE Department'),
-      ),
-      body: ListView(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('CSE Department'),
+        ),
+        body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
           _buildCard(context, 'About CSE Department',
@@ -40,8 +45,9 @@ class DepartmentScreen extends StatelessWidget {
           ]),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCard(BuildContext context, String title, String body) {
     final colors = Theme.of(context).colorScheme;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import '../models/job_state.dart';
 import '../presentation/bloc/job_bloc.dart';
@@ -252,11 +253,15 @@ class _JobsScreenState extends State<JobsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Board'),
-      ),
-      body: BlocListener<JobBloc, bloc_state.JobState>(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Job Board'),
+        ),
+        body: BlocListener<JobBloc, bloc_state.JobState>(
         listener: (context, state) {
           if (state is bloc_state.JobError) {
             _showToast(context, state.message, isError: true);
@@ -319,8 +324,9 @@ class _JobsScreenState extends State<JobsScreen> {
           return const SizedBox.shrink();
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildJobCard(JobItem job) {
     final colors = Theme.of(context).colorScheme;

@@ -12,6 +12,7 @@ import '../presentation/bloc/alumni_bloc.dart';
 import '../presentation/bloc/alumni_event.dart';
 import '../presentation/bloc/alumni_state.dart';
 import 'alumni_detail_screen.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 class AlumniScreen extends StatefulWidget {
   const AlumniScreen({super.key});
@@ -262,8 +263,14 @@ class _AlumniScreenState extends State<AlumniScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Alumni')),
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Alumni'),
+        ),
       body: BlocBuilder<AlumniBloc, AlumniState>(
         builder: (context, state) {
           final isAdmin = currentProfile.value.role != UserRole.student;
@@ -314,8 +321,9 @@ class _AlumniScreenState extends State<AlumniScreen> {
           return const SizedBox.shrink();
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCard(AlumniItem alumni) {
     final colors = Theme.of(context).colorScheme;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:ShEC_CSE/features/dashboard/screens/main_screen.dart';
 import 'package:ShEC_CSE/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:ShEC_CSE/features/auth/presentation/bloc/auth_event.dart';
@@ -37,8 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      body: BlocConsumer<AuthBloc, AuthState>(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             Navigator.pushReplacement(
@@ -198,6 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

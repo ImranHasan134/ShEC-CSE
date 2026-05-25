@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; // Required for making the link clickable
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 // --- Data Models ---
 class CourseData {
@@ -118,10 +119,14 @@ class _CGPACalculatorScreenState extends State<CGPACalculatorScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('CGPA Calculator'),
-      ),
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('CGPA Calculator'),
+        ),
       body: Column(
         children: [
           // Sticky Header for Overall Result
@@ -183,6 +188,7 @@ class _CGPACalculatorScreenState extends State<CGPACalculatorScreen> {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Add Semester'),
+      ),
       ),
     );
   }

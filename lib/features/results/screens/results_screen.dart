@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import '../../profile/models/profile_state.dart';
 import '../models/result_state.dart';
 import '../../../backend/services/result_service.dart';
@@ -70,9 +71,13 @@ class _ResultsScreenState extends State<ResultsScreen> with SingleTickerProvider
       builder: (context, state) {
         final isSyncing = state.isSyncing;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Academic Results'),
+        return AmbientTimeBackground(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('Academic Results'),
             actions: [
               if (isSyncing)
                 const Padding(
@@ -176,6 +181,7 @@ class _ResultsScreenState extends State<ResultsScreen> with SingleTickerProvider
                   label: const Text('Fetch Specific Exam'),
                   icon: const Icon(Icons.sync_alt),
                 ),
+          ),
         );
       },
     );

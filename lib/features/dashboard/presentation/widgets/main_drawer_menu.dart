@@ -20,6 +20,7 @@ import 'package:ShEC_CSE/features/club/screens/club_members_screen.dart';
 import 'package:ShEC_CSE/features/about/screens/contributors_screen.dart';
 import 'package:ShEC_CSE/features/alumni/screens/alumni_screen.dart';
 import 'package:ShEC_CSE/features/accounting/presentation/screens/accounting_dashboard_screen.dart';
+import 'package:ShEC_CSE/features/dashboard/screens/aesthetics_settings_screen.dart';
 
 class MainDrawerMenu extends StatelessWidget {
   final ColorScheme colors;
@@ -201,7 +202,13 @@ class MainDrawerMenu extends StatelessWidget {
                             child: Divider(color: Colors.grey, thickness: 0.1),
                           ),
                           _menuSectionHeader('Appearance'),
-                          _buildThemeSelectorInsideMenu(context),
+                          _menuItem(
+                            context,
+                            controller,
+                            icon: Icons.palette_outlined,
+                            title: 'Aesthetics & Themes',
+                            destination: const AestheticsSettingsScreen(),
+                          ),
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -405,162 +412,7 @@ class MainDrawerMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildThemeSelectorInsideMenu(BuildContext context) {
-    final themeService = ThemeService.instance;
-    return ListenableBuilder(
-      listenable: themeService,
-      builder: (context, _) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Theme Mode',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.9)),
-              ),
-              const SizedBox(height: 8),
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      _buildThemeModeButton(context, themeService, AppThemeMode.system, 'System', Icons.brightness_auto_outlined),
-                      const SizedBox(width: 8),
-                      _buildThemeModeButton(context, themeService, AppThemeMode.light, 'Light', Icons.light_mode_outlined),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _buildThemeModeButton(context, themeService, AppThemeMode.dark, 'Dark', Icons.dark_mode_outlined),
-                      const SizedBox(width: 8),
-                      _buildThemeModeButton(context, themeService, AppThemeMode.night, 'Night', Icons.nights_stay_outlined),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Color Scheme',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.9)),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 34,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: AppColorTheme.values.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 6),
-                  itemBuilder: (context, index) {
-                    final colorTheme = AppColorTheme.values[index];
-                    final isSelected = themeService.colorTheme == colorTheme;
-                    Color color;
-                    switch (colorTheme) {
-                      case AppColorTheme.teal:
-                        color = const Color(0xFF00ADB5);
-                        break;
-                      case AppColorTheme.blue:
-                        color = const Color(0xFF1E88E5);
-                        break;
-                      case AppColorTheme.purple:
-                        color = const Color(0xFF8E24AA);
-                        break;
-                      case AppColorTheme.green:
-                        color = const Color(0xFF43A047);
-                        break;
-                      case AppColorTheme.amber:
-                        color = const Color(0xFFFFB300);
-                        break;
-                      case AppColorTheme.crimson:
-                        color = const Color(0xFFE53935);
-                        break;
-                    }
-                    return GestureDetector(
-                      onTap: () => themeService.setColorTheme(colorTheme),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected ? Colors.white : Colors.transparent,
-                            width: 2.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white, size: 16)
-                            : null,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
-  Widget _buildThemeModeButton(
-    BuildContext context,
-    ThemeService themeService,
-    AppThemeMode mode,
-    String label,
-    IconData icon,
-  ) {
-    final isSelected = themeService.themeMode == mode;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => themeService.setThemeMode(mode),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? colors.primary : Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: colors.primary.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   void _showUpdateDialog(BuildContext parentContext) {
     final updateService = UpdateService.instance;

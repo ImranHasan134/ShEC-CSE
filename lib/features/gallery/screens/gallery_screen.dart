@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import 'package:ShEC_CSE/core/services/image_processing_service.dart';
@@ -329,9 +330,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Gallery')),
-      body: BlocBuilder<GalleryBloc, GalleryState>(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Gallery'),
+        ),
+        body: BlocBuilder<GalleryBloc, GalleryState>(
         builder: (context, state) {
           final profile = currentProfile.value;
           final isAdmin = profile.role != UserRole.student;
@@ -393,8 +400,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
           return const SizedBox.shrink();
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildGalleryCard({required BuildContext context, required GalleryItem item}) {
     final colors = Theme.of(context).colorScheme;

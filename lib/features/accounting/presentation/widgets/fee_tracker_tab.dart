@@ -55,6 +55,7 @@ class _FeeTrackerTabState extends State<FeeTrackerTab> {
     }).toList();
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Column(
         children: [
           Padding(

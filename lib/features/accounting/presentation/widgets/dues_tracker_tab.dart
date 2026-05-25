@@ -110,7 +110,8 @@ class _DuesTrackerTabState extends State<DuesTrackerTab> {
         }
       },
       child: Scaffold(
-      body: Column(
+        backgroundColor: Colors.transparent,
+        body: Column(
         children: [
           // 1. Month Chevron Switcher Row
           Container(

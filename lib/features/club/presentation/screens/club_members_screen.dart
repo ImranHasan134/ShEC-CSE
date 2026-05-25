@@ -6,6 +6,7 @@ import '../../../profile/models/profile_state.dart';
 import '../widgets/member_card.dart';
 import '../widgets/member_details_sheet.dart';
 import '../widgets/role_management_dialog.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 class ClubMembersScreen extends StatefulWidget {
   const ClubMembersScreen({super.key});
@@ -454,9 +455,13 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
     final committees = filteredAll.where((m) => (m.role == UserRole.committeeMember || m.role == UserRole.superUser) && m.isApproved).toList();
     final pending = filteredAll.where((m) => !m.isApproved).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Club Directory'),
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Club Directory'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(110),
           child: Column(
@@ -514,6 +519,7 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> with SingleTicker
                 if (isAdmin) _buildList(pending, isPendingList: true),
               ],
             ),
+      ),
     );
   }
 }

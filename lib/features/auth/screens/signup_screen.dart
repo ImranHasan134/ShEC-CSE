@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ShEC_CSE/core/services/storage_service.dart';
 import 'package:ShEC_CSE/core/services/image_processing_service.dart';
@@ -184,7 +185,9 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Create an Account'),
         backgroundColor: Colors.transparent,
@@ -380,8 +383,9 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _sectionLabel(String text) {
     return Text(

@@ -68,6 +68,7 @@ class _ExpenseLoggerTabState extends State<ExpenseLoggerTab> {
     }).toList();
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Column(
         children: [
           Padding(

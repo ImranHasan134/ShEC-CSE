@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../profile/models/profile_state.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import '../../../../backend/services/auth_service.dart';
 
 class ClubScreen extends StatefulWidget {
@@ -50,11 +51,15 @@ class _ClubScreenState extends State<ClubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Programming Club'),
-      ),
-      body: RefreshIndicator(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Programming Club'),
+        ),
+        body: RefreshIndicator(
         onRefresh: _fetchCommittee,
         child: ListView(
           padding: const EdgeInsets.all(16.0),
@@ -73,8 +78,9 @@ class _ClubScreenState extends State<ClubScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Padding(

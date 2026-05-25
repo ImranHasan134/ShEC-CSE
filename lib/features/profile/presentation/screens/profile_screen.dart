@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:ShEC_CSE/core/services/storage_service.dart';
@@ -179,9 +180,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
-      body: BlocConsumer<AuthBloc, AuthState>(
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Edit Profile'),
+        ),
+        body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (_isSubmitting) {
             if (state is AuthAuthenticated) {
@@ -341,15 +348,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _sectionLabel(String text) {
     return Text(

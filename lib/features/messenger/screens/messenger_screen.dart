@@ -26,6 +26,7 @@ class _MessengerScreenState extends State<MessengerScreen> {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: BlocBuilder<ChatBloc, ChatState>(
         builder: (context, state) {
           final rooms = context.read<ChatBloc>().rooms;

@@ -7,6 +7,7 @@ import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../widgets/add_edit_teacher_sheet.dart';
 import '../widgets/teacher_card.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 class TeacherContactsScreen extends StatefulWidget {
   const TeacherContactsScreen({super.key});
@@ -57,8 +58,14 @@ class _TeacherContactsScreenState extends State<TeacherContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Teacher Contacts')),
+    return AmbientTimeBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('Teacher Contacts'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
       body: BlocListener<TeacherBloc, TeacherState>(
         listener: (context, state) {
           if (state is TeacherError) {
@@ -113,6 +120,7 @@ class _TeacherContactsScreenState extends State<TeacherContactsScreen> {
           return const SizedBox.shrink();
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -15,6 +15,7 @@ import 'package:ShEC_CSE/backend/services/contest_service.dart';
 import 'package:ShEC_CSE/backend/services/chat_service.dart';
 import 'package:ShEC_CSE/features/dashboard/presentation/widgets/animated_profile_icon.dart';
 import 'package:ShEC_CSE/features/dashboard/presentation/widgets/main_drawer_menu.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 class HomeLayout extends StatefulWidget {
   const HomeLayout({super.key});
@@ -102,8 +103,12 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
             if (didPop) return;
             setState(() => _currentIndex = 0);
           },
-          child: Scaffold(
-            appBar: AppBar(
+          child: AmbientTimeBackground(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
               leading: ListenableBuilder(
                 listenable: UpdateService.instance,
                 builder: (context, _) {
@@ -232,8 +237,9 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
               ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
       slidePercent: 60.0,
       verticalScalePercent: 90.0,
       contentCornerRadius: 24.0,

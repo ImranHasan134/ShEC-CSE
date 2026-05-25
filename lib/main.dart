@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ShEC_CSE/backend/services/auth_service.dart';
 
 import 'package:ShEC_CSE/core/services/theme_service.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 // Import Feature BLoCs
 import 'package:ShEC_CSE/features/auth/presentation/bloc/auth_bloc.dart';
@@ -60,6 +61,9 @@ Future<void> main() async {
 
   // Initialize Theme Service
   await ThemeService.instance.init();
+  
+  // Initialize Ambient Settings
+  await AmbientSettings.init();
   
   // Initialize listener with navigation capability
   Supabase.instance.client.auth.onAuthStateChange.listen((data) {

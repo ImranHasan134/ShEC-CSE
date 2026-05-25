@@ -180,7 +180,10 @@ class _ContestsScreenState extends State<ContestsScreen> {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Contests'),
       ),
       body: BlocBuilder<ContestBloc, ContestState>(

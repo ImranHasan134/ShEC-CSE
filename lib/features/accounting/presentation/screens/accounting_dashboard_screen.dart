@@ -7,6 +7,7 @@ import '../widgets/overview_tab.dart';
 import '../widgets/fee_tracker_tab.dart';
 import '../widgets/expense_logger_tab.dart';
 import '../widgets/dues_tracker_tab.dart';
+import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 
 class AccountingDashboardScreen extends StatefulWidget {
   const AccountingDashboardScreen({super.key});
@@ -69,9 +70,13 @@ class _AccountingDashboardScreenState extends State<AccountingDashboardScreen> {
       },
       child: DefaultTabController(
         length: 4,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Club Accounts'),
+        child: AmbientTimeBackground(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('Club Accounts'),
             bottom: TabBar(
               isScrollable: true,
               tabAlignment: TabAlignment.start,
@@ -113,6 +118,7 @@ class _AccountingDashboardScreenState extends State<AccountingDashboardScreen> {
           ),
         ),
       ),
+     ),
     );
   }
 }
