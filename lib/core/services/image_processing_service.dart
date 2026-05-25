@@ -18,13 +18,36 @@ class ImageProcessingService {
 
     File localFile = imageFile;
     bool isTemporaryCopy = false;
+
     try {
       final tempDir = await getTemporaryDirectory();
-      final tempPath = p.join(tempDir.path, "crop_input_${DateTime.now().millisecondsSinceEpoch}${p.extension(imageFile.path)}");
-      localFile = await imageFile.copy(tempPath);
-      isTemporaryCopy = true;
+      final targetPath = p.join(
+        tempDir.path,
+        "crop_prep_${DateTime.now().millisecondsSinceEpoch}.jpg",
+      );
+      
+      debugPrint('Pre-compressing and optimizing image before cropping: ${imageFile.path}');
+      
+      // Native compression to avoid memory spike in Dart, handles HEIC/HEIF,
+      // and downscales extremely large photos to prevent OpenGL texture allocation failures (black screen)
+      final result = await FlutterImageCompress.compressAndGetFile(
+        imageFile.absolute.path,
+        targetPath,
+        format: CompressFormat.jpeg,
+        quality: 90,
+        minWidth: 1920,
+        minHeight: 1920,
+      );
+      
+      if (result != null) {
+        localFile = File(result.path);
+        isTemporaryCopy = true;
+        debugPrint('Successfully pre-processed image: ${localFile.path}, size: ${await localFile.length()} bytes');
+      } else {
+        debugPrint('Pre-compression returned null. Falling back to original file.');
+      }
     } catch (e) {
-      debugPrint('Failed to copy file to temp directory before cropping: $e');
+      debugPrint('Error pre-processing image before cropping: $e');
     }
 
     try {
@@ -55,7 +78,7 @@ class ImageProcessingService {
         try {
           await localFile.delete();
         } catch (e) {
-          debugPrint('Failed to delete temporary crop input file: $e');
+          debugPrint('Failed to delete temporary pre-crop file: $e');
         }
       }
     }
