@@ -60,11 +60,33 @@ class _BatchResultsTabState extends State<BatchResultsTab> {
 
     return BlocBuilder<ResultBloc, ResultState>(
       builder: (context, state) {
-        if (state is BatchResultsLoading) {
+        if (state.isBatchLoading && state.batchResults.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (state is BatchResultsLoaded) {
+        if (state.errorMessage != null && state.batchResults.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(state.errorMessage!, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _fetchBatchResults,
+                    child: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // If batchResults is loaded, or if loading completed
+        if (state.batchResults.isNotEmpty || (!state.isBatchLoading && _selectedSession.isNotEmpty)) {
           // Extract unique exams/semesters dynamically for filter dropdown
           final List<String> availableSemesters = ['All'];
           for (var r in state.batchResults) {
@@ -99,50 +121,40 @@ class _BatchResultsTabState extends State<BatchResultsTab> {
             return subjectMatch;
           }).toList();
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          return Stack(
             children: [
-              // 1. Filtration Panel
-              _buildFiltrationPanel(colors, isCommittee, availableSemesters),
-
-              // 2. Dynamic Performance Insights Panel
-              if (_selectedSemester != 'All' && _subjectSearchQuery.isNotEmpty)
-                _buildGradeDistributionAnalysisCard(filteredResults, colors),
-
-              // 3. Directory List
-              Expanded(
-                child: filteredResults.isEmpty
-                    ? _buildEmptyState(colors)
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: filteredResults.length,
-                        itemBuilder: (context, index) {
-                          return _buildBatchMemberCard(filteredResults[index], colors);
-                        },
-                      ),
-              ),
-            ],
-          );
-        }
-
-        if (state is ResultError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(state.message, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _fetchBatchResults,
-                    child: const Text('Try Again'),
+                  // 1. Filtration Panel
+                  _buildFiltrationPanel(colors, isCommittee, availableSemesters),
+
+                  // 2. Dynamic Performance Insights Panel
+                  if (_selectedSemester != 'All' && _subjectSearchQuery.isNotEmpty)
+                    _buildGradeDistributionAnalysisCard(filteredResults, colors),
+
+                  // 3. Directory List
+                  Expanded(
+                    child: filteredResults.isEmpty
+                        ? _buildEmptyState(colors)
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            itemCount: filteredResults.length,
+                            itemBuilder: (context, index) {
+                              return _buildBatchMemberCard(filteredResults[index], colors);
+                            },
+                          ),
                   ),
                 ],
               ),
-            ),
+              if (state.isBatchLoading)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(),
+                ),
+            ],
           );
         }
 

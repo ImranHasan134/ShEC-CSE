@@ -2,7 +2,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../backend/services/result_service.dart';
 import '../../../../backend/services/result_scraper_service.dart';
 import '../../../profile/models/profile_state.dart';
-import '../../models/result_state.dart';
 import 'result_event.dart';
 import 'result_state.dart';
 

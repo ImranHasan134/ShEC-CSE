@@ -53,22 +53,22 @@ class _ResultsScreenState extends State<ResultsScreen> with SingleTickerProvider
 
     return BlocConsumer<ResultBloc, ResultState>(
       listener: (context, state) {
-        if (state is ResultSyncInProgress) {
+        if (state.isSyncing) {
           _isSyncing = true;
-        } else if (state is ResultsLoaded && _isSyncing) {
+        } else if (!state.isSyncing && _isSyncing && state.errorMessage == null) {
           _isSyncing = false;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Sync complete!')),
           );
-        } else if (state is ResultError) {
+        } else if (state.errorMessage != null) {
           _isSyncing = false;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+            SnackBar(content: Text(state.errorMessage!), backgroundColor: Colors.red),
           );
         }
       },
       builder: (context, state) {
-        final isSyncing = state is ResultSyncInProgress;
+        final isSyncing = state.isSyncing;
 
         return Scaffold(
           appBar: AppBar(
@@ -182,18 +182,13 @@ class _ResultsScreenState extends State<ResultsScreen> with SingleTickerProvider
   }
 
   Widget _buildOwnDashboard(BuildContext context, ResultState state, ColorScheme colors) {
-    if (state is ResultLoading) {
+    if (state.isOwnLoading && state.ownResults.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    List<ExamResult> results = [];
-    if (state is ResultsLoaded) {
-      results = state.results;
-    } else if (state is ResultSyncInProgress) {
-      results = state.results;
-    }
+    final results = state.ownResults;
 
     if (results.isEmpty) {
       return Center(
@@ -489,6 +484,7 @@ class _ManageExamsDialogState extends State<_ManageExamsDialog> {
                       final examId = exam['exam_id'] ?? '';
                       final examName = exam['exam_name'] ?? '';
                       final session = exam['session'] ?? '';
+                      final semester = exam['semester'] ?? '';
 
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -509,6 +505,14 @@ class _ManageExamsDialogState extends State<_ManageExamsDialog> {
                                   fontWeight: session.isEmpty ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
+                              if (semester.isNotEmpty)
+                                Text(
+                                  'Semester: $semester',
+                                  style: TextStyle(
+                                    color: colors.secondary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -599,6 +603,7 @@ class _AddEditExamDialogState extends State<_AddEditExamDialog> {
   final _nameController = TextEditingController();
   final _idController = TextEditingController();
   String? _selectedSession;
+  int? _selectedSemester;
   List<String> _sessions = [];
   bool _isLoadingSessions = true;
   bool _isSaving = false;
@@ -613,6 +618,8 @@ class _AddEditExamDialogState extends State<_AddEditExamDialog> {
       if (_selectedSession != null && _selectedSession!.isEmpty) {
         _selectedSession = null;
       }
+      final semStr = widget.examToEdit!['semester'];
+      _selectedSemester = semStr != null ? int.tryParse(semStr) : null;
     }
     _loadSessions();
   }
@@ -692,6 +699,28 @@ class _AddEditExamDialogState extends State<_AddEditExamDialog> {
                     },
                     validator: (val) => val == null ? 'Session is required' : null,
                   ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    initialValue: _selectedSemester,
+                    decoration: const InputDecoration(
+                      labelText: 'Semester *',
+                      border: OutlineInputBorder(),
+                      helperText: 'Select Dhaka University Semester (1-8)',
+                    ),
+                    items: List.generate(8, (index) {
+                      final sem = index + 1;
+                      return DropdownMenuItem<int>(
+                        value: sem,
+                        child: Text('Semester $sem'),
+                      );
+                    }),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedSemester = val;
+                      });
+                    },
+                    validator: (val) => val == null ? 'Semester is required' : null,
+                  ),
                 ],
               ),
             ),
@@ -718,8 +747,9 @@ class _AddEditExamDialogState extends State<_AddEditExamDialog> {
     final name = _nameController.text.trim();
     final id = _idController.text.trim();
     final session = _selectedSession;
+    final semester = _selectedSemester;
 
-    if (name.isEmpty || id.isEmpty || session == null || session.isEmpty) {
+    if (name.isEmpty || id.isEmpty || session == null || session.isEmpty || semester == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
       );
@@ -731,7 +761,7 @@ class _AddEditExamDialogState extends State<_AddEditExamDialog> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      await ResultService.addExamId(name, id, session);
+      await ResultService.addExamId(name, id, session, semester);
       navigator.pop(true); // Return true to indicate successful save
     } catch (e) {
       setState(() => _isSaving = false);

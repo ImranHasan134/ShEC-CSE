@@ -39,6 +39,7 @@ class ExamResult {
   final String gpa;
   final String cgpa;
   final List<SubjectResult> subjects;
+  final int? semester;
 
   ExamResult({
     required this.id,
@@ -48,9 +49,19 @@ class ExamResult {
     required this.gpa,
     required this.cgpa,
     required this.subjects,
+    this.semester,
   });
 
   factory ExamResult.fromDB(Map<String, dynamic> json, List<SubjectResult> subjects) {
+    final examIdData = json['DUCMC_exams_id'];
+    int? semVal;
+    if (examIdData is Map) {
+      semVal = examIdData['semester'] as int?;
+    } else if (examIdData is List && examIdData.isNotEmpty) {
+      semVal = examIdData.first['semester'] as int?;
+    }
+    semVal ??= json['semester'] as int?;
+
     return ExamResult(
       id: json['id'] ?? '',
       regNo: json['reg_no'] ?? '',
@@ -59,6 +70,7 @@ class ExamResult {
       gpa: json['gpa']?.toString() ?? '',
       cgpa: json['cgpa']?.toString() ?? '',
       subjects: subjects,
+      semester: semVal,
     );
   }
 
@@ -73,6 +85,7 @@ class ExamResult {
       gpa: json['gpa']?.toString() ?? '',
       cgpa: json['cgpa']?.toString() ?? '',
       subjects: subjectsList.map((s) => SubjectResult.fromJson(s)).toList(),
+      semester: json['semester'] as int?,
     );
   }
 }
