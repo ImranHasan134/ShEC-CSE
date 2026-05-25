@@ -32,6 +32,13 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    ChatService.activeRoomId = widget.roomId;
+    
+    // Clear unreads for this room on entry
+    final currentUnreads = Map<String, int>.from(chatRoomUnreadCounts.value);
+    currentUnreads[widget.roomId] = 0;
+    chatRoomUnreadCounts.value = currentUnreads;
+
     context.read<ChatBloc>().add(FetchHistoryRequested(roomId: widget.roomId));
     _setupRealtime();
   }
@@ -58,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    ChatService.activeRoomId = null;
     if (_subscription != null) {
       Supabase.instance.client.removeChannel(_subscription!);
     }

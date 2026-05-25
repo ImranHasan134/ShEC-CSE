@@ -6,7 +6,10 @@ import 'notification_service.dart';
 class ChatService {
   static final SupabaseClient _client = Supabase.instance.client;
 
-  // Fetch available rooms based on user role
+  // Track the active room ID the user is currently viewing to avoid marking incoming messages as unread
+  static String? activeRoomId;
+
+  // Fetch available rooms and their latest message previews
   static Future<List<ChatRoom>> fetchRooms() async {
     isLoadingChatRooms.value = true;
     try {
@@ -15,9 +18,29 @@ class ChatService {
           .map((row) => ChatRoom.fromJson(row))
           .toList();
       chatRoomsList.value = rooms;
+
+      // Fetch the latest messages for all rooms to populate list previews
+      final userId = _client.auth.currentUser?.id ?? '';
+      if (userId.isNotEmpty && rooms.isNotEmpty) {
+        try {
+          final lastMessagesResponse = await _client
+              .from('messages')
+              .select()
+              .order('created_at', ascending: false);
+          
+          final Map<String, ChatMessage> lastMessagesMap = {};
+          for (var m in lastMessagesResponse) {
+            final msg = ChatMessage.fromJson(m, userId);
+            lastMessagesMap.putIfAbsent(msg.roomId, () => msg);
+          }
+          chatRoomLastMessages.value = lastMessagesMap;
+        } catch (e) {
+          // Silently ignore preview load errors
+        }
+      }
+
       return rooms;
     } catch (e) {
-      print('Error fetching chat rooms: $e');
       rethrow;
     } finally {
       isLoadingChatRooms.value = false;
@@ -35,11 +58,18 @@ class ChatService {
       'room_id': roomId,
       'sender_id': user.id,
       'sender_name': profile.name.isEmpty ? 'Member' : profile.name,
-      'sender_image': profile.imagePath, // Save the profile image path
+      'sender_image': profile.imagePath, 
       'text': text,
     }).select().single();
 
-    return ChatMessage.fromJson(response, user.id);
+    final sentMsg = ChatMessage.fromJson(response, user.id);
+
+    // Instantly update the last message preview locally for immediate UI updates
+    final currentPrevs = Map<String, ChatMessage>.from(chatRoomLastMessages.value);
+    currentPrevs[roomId] = sentMsg;
+    chatRoomLastMessages.value = currentPrevs;
+
+    return sentMsg;
   }
 
   // Subscribe to real-time messages for a room
@@ -59,6 +89,12 @@ class ChatService {
           ),
           callback: (payload) {
             final newMessage = ChatMessage.fromJson(payload.newRecord, userId);
+
+            // Update real-time previews for list views
+            final currentPrevs = Map<String, ChatMessage>.from(chatRoomLastMessages.value);
+            currentPrevs[roomId] = newMessage;
+            chatRoomLastMessages.value = currentPrevs;
+
             onMessage(newMessage);
           },
         )
@@ -79,14 +115,13 @@ class ChatService {
           .map((row) => ChatMessage.fromJson(row, userId))
           .toList();
     } catch (e) {
-      print('Error fetching history: $e');
       return [];
     }
   }
 
   static RealtimeChannel? _globalMessagesChannel;
 
-  // Global subscription for background notifications
+  // Global subscription for background notifications and unread tracking
   static void subscribeToAllMessages() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
@@ -100,25 +135,40 @@ class ChatService {
         table: 'messages',
         callback: (payload) {
           final data = payload.newRecord;
-          if (data['sender_id'] != userId) {
-            final room = chatRoomsList.value.firstWhere(
-              (r) => r.id == data['room_id'],
-              orElse: () => ChatRoom(
-                id: '', 
-                name: 'Group', 
-                description: '', 
-                type: ChatRoomType.general,
-                iconKey: 'groups',
-                createdAt: DateTime.now(),
-              ),
-            );
+          final roomId = data['room_id'] ?? '';
+          final newMessage = ChatMessage.fromJson(data, userId);
 
-            NotificationService.incrementUnread('messenger');
-            NotificationService.showNotification(
-              id: 4,
-              title: '${data['sender_name']} (${room.name})',
-              body: data['text'] ?? 'Sent a message',
-            );
+          // Update last message preview in real-time
+          final currentPrevs = Map<String, ChatMessage>.from(chatRoomLastMessages.value);
+          currentPrevs[roomId] = newMessage;
+          chatRoomLastMessages.value = currentPrevs;
+
+          if (data['sender_id'] != userId) {
+            // ONLY increment unreads if the user is NOT inside this active chat room!
+            if (activeRoomId != roomId) {
+              final currentUnreads = Map<String, int>.from(chatRoomUnreadCounts.value);
+              currentUnreads[roomId] = (currentUnreads[roomId] ?? 0) + 1;
+              chatRoomUnreadCounts.value = currentUnreads;
+
+              final room = chatRoomsList.value.firstWhere(
+                (r) => r.id == roomId,
+                orElse: () => ChatRoom(
+                  id: '', 
+                  name: 'Group', 
+                  description: '', 
+                  type: ChatRoomType.general,
+                  iconKey: 'groups',
+                  createdAt: DateTime.now(),
+                ),
+              );
+
+              NotificationService.incrementUnread('messenger');
+              NotificationService.showNotification(
+                id: 4,
+                title: '${data['sender_name']} (${room.name})',
+                body: data['text'] ?? 'Sent a message',
+              );
+            }
           }
         },
       );

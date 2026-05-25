@@ -76,3 +76,5 @@ class ChatMessage {
 // Global Notifiers
 final ValueNotifier<List<ChatRoom>> chatRoomsList = ValueNotifier([]);
 final ValueNotifier<bool> isLoadingChatRooms = ValueNotifier(false);
+final ValueNotifier<Map<String, int>> chatRoomUnreadCounts = ValueNotifier({});
+final ValueNotifier<Map<String, ChatMessage>> chatRoomLastMessages = ValueNotifier({});
