@@ -137,7 +137,7 @@ class _CgpaPredictionChartState extends State<CgpaPredictionChart> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'Projected Final CGPA',
+                      'Predicted Final CGPA',
                       style: TextStyle(fontSize: 12, color: colors.onSurface.withValues(alpha: 0.6), fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 4),

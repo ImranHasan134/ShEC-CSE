@@ -121,6 +121,27 @@ class _BatchResultsTabState extends State<BatchResultsTab> {
             return subjectMatch;
           }).toList();
 
+          // Group filtered results by student
+          final Map<String, List<BatchMemberResult>> groupedResults = {};
+          for (var item in filteredResults) {
+            final studentId = item.profile.id;
+            groupedResults.putIfAbsent(studentId, () => []).add(item);
+          }
+
+          final studentIds = groupedResults.keys.toList();
+          // Sort student list by class roll (ascending) or name if rolls are equal/empty
+          studentIds.sort((idA, idB) {
+            final pA = groupedResults[idA]!.first.profile;
+            final pB = groupedResults[idB]!.first.profile;
+            
+            final rollA = int.tryParse(pA.classRoll) ?? 999999;
+            final rollB = int.tryParse(pB.classRoll) ?? 999999;
+            if (rollA != rollB) {
+              return rollA.compareTo(rollB);
+            }
+            return pA.name.compareTo(pB.name);
+          });
+
           return Stack(
             children: [
               Column(
@@ -135,13 +156,15 @@ class _BatchResultsTabState extends State<BatchResultsTab> {
 
                   // 3. Directory List
                   Expanded(
-                    child: filteredResults.isEmpty
+                    child: studentIds.isEmpty
                         ? _buildEmptyState(colors)
                         : ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            itemCount: filteredResults.length,
+                            itemCount: studentIds.length,
                             itemBuilder: (context, index) {
-                              return _buildBatchMemberCard(filteredResults[index], colors);
+                              final studentId = studentIds[index];
+                              final studentItems = groupedResults[studentId]!;
+                              return _buildStudentAccordion(studentItems, state.batchResults, colors);
                             },
                           ),
                   ),
@@ -379,7 +402,197 @@ class _BatchResultsTabState extends State<BatchResultsTab> {
     );
   }
 
-  Widget _buildBatchMemberCard(BatchMemberResult item, ColorScheme colors) {
+  int _parseSemesterNumber(String examName) {
+    final name = examName.toLowerCase();
+    if (name.contains('1st year 1st') || name.contains('1st sem') || name.contains('1-1') || (name.contains('1st year') && name.contains('1st'))) return 1;
+    if (name.contains('1st year 2nd') || name.contains('2nd sem') || name.contains('1-2') || (name.contains('1st year') && name.contains('2nd'))) return 2;
+    if (name.contains('2nd year 1st') || name.contains('3rd sem') || name.contains('2-1') || (name.contains('2nd year') && name.contains('1st'))) return 3;
+    if (name.contains('2nd year 2nd') || name.contains('4th sem') || name.contains('2-2') || (name.contains('2nd year') && name.contains('2nd'))) return 4;
+    if (name.contains('3rd year 1st') || name.contains('5th sem') || name.contains('3-1') || (name.contains('3rd year') && name.contains('1st'))) return 5;
+    if (name.contains('3rd year 2nd') || name.contains('6th sem') || name.contains('3-2') || (name.contains('3rd year') && name.contains('2nd'))) return 6;
+    if (name.contains('4th year 1st') || name.contains('7th sem') || name.contains('4-1') || (name.contains('4th year') && name.contains('1st'))) return 7;
+    if (name.contains('4th year 2nd') || name.contains('8th sem') || name.contains('4-2') || (name.contains('4th year') && name.contains('2nd'))) return 8;
+
+    if (name.contains('1st')) return 1;
+    if (name.contains('2nd')) return 2;
+    if (name.contains('3rd')) return 3;
+    if (name.contains('4th')) return 4;
+    if (name.contains('5th')) return 5;
+    if (name.contains('6th')) return 6;
+    if (name.contains('7th')) return 7;
+    if (name.contains('8th')) return 8;
+
+    return 1;
+  }
+
+  String _getOrdinalSuffix(int number) {
+    if (number == 1) return 'st';
+    if (number == 2) return 'nd';
+    if (number == 3) return 'rd';
+    return 'th';
+  }
+
+  double _getLatestStudentCgpa(String studentId, List<BatchMemberResult> allResults) {
+    double latestCgpa = 0.0;
+    int maxSemester = 0;
+    for (var r in allResults) {
+      if (r.profile.id == studentId) {
+        final sem = r.result.semester ?? _parseSemesterNumber(r.result.examName);
+        if (sem > maxSemester) {
+          maxSemester = sem;
+          final cgpaVal = double.tryParse(r.result.cgpa) ?? 0.0;
+          if (cgpaVal > 0.0) {
+            latestCgpa = cgpaVal;
+          }
+        }
+      }
+    }
+    
+    // Fallback: average GPAs if latestCgpa is 0
+    if (latestCgpa == 0.0) {
+      double sumGpa = 0.0;
+      int count = 0;
+      for (var r in allResults) {
+        if (r.profile.id == studentId) {
+          final gpaVal = double.tryParse(r.result.gpa) ?? 0.0;
+          if (gpaVal > 0.0) {
+            sumGpa += gpaVal;
+            count++;
+          }
+        }
+      }
+      if (count > 0) {
+        latestCgpa = sumGpa / count;
+      }
+    }
+    
+    return latestCgpa;
+  }
+
+  Widget _buildStudentAccordion(
+    List<BatchMemberResult> studentItems,
+    List<BatchMemberResult> allResults,
+    ColorScheme colors,
+  ) {
+    final profile = studentItems.first.profile;
+    final latestCgpa = _getLatestStudentCgpa(profile.id, allResults);
+
+    // Group semesters by academic year: 1=1st, 2=2nd, 3=3rd, 4=4th Year
+    final Map<int, List<BatchMemberResult>> yearsMap = {};
+    for (var item in studentItems) {
+      final sem = item.result.semester ?? _parseSemesterNumber(item.result.examName);
+      int year = 1;
+      if (sem == 1 || sem == 2) {
+        year = 1;
+      } else if (sem == 3 || sem == 4) {
+        year = 2;
+      } else if (sem == 5 || sem == 6) {
+        year = 3;
+      } else if (sem == 7 || sem == 8) {
+        year = 4;
+      }
+      yearsMap.putIfAbsent(year, () => []).add(item);
+    }
+    
+    final sortedYears = yearsMap.keys.toList()..sort();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outline.withValues(alpha: 0.1)),
+      ),
+      color: colors.surface,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          childrenPadding: const EdgeInsets.only(bottom: 12),
+          leading: CircleAvatar(
+            radius: 22,
+            backgroundColor: colors.primary.withValues(alpha: 0.1),
+            backgroundImage: profile.imagePath != null
+                ? NetworkImage(profile.imagePath!)
+                : null,
+            child: profile.imagePath == null
+                ? Text(
+                    (profile.name.isNotEmpty ? profile.name[0] : '?').toUpperCase(),
+                    style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold, fontSize: 16),
+                  )
+                : null,
+          ),
+          title: Text(
+            profile.name,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Roll: ${profile.classRoll.isNotEmpty ? profile.classRoll : "N/A"} | ID: ${profile.universityId.isNotEmpty ? profile.universityId : "N/A"}',
+                  style: TextStyle(fontSize: 11, color: colors.onSurface.withValues(alpha: 0.5)),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+                  ),
+                  child: Text(
+                    'CGPA: ${latestCgpa > 0.0 ? latestCgpa.toStringAsFixed(2) : "N/A"}',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          children: [
+            const Divider(height: 1),
+            ...sortedYears.map((yearNum) {
+              final yearItems = yearsMap[yearNum]!;
+              // Sort semesters inside yearItems by semester index
+              yearItems.sort((a, b) {
+                final semA = a.result.semester ?? _parseSemesterNumber(a.result.examName);
+                final semB = b.result.semester ?? _parseSemesterNumber(b.result.examName);
+                return semA.compareTo(semB);
+              });
+
+              final yearLabel = '$yearNum${_getOrdinalSuffix(yearNum)} Year';
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerLow.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colors.outline.withValues(alpha: 0.05)),
+                  ),
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      title: Text(
+                        yearLabel,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.primary),
+                      ),
+                      leading: Icon(Icons.school_outlined, size: 18, color: colors.primary),
+                      children: yearItems.map((item) => _buildSemesterSubTile(item, colors)).toList(),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSemesterSubTile(BatchMemberResult item, ColorScheme colors) {
     // Locate filtered subject if any search query is set
     SubjectResult? searchedSubject;
     if (_subjectSearchQuery.isNotEmpty) {
@@ -393,102 +606,75 @@ class _BatchResultsTabState extends State<BatchResultsTab> {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6).copyWith(bottom: 10),
       elevation: 0,
+      color: colors.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: colors.outline.withValues(alpha: 0.1)),
       ),
-      color: colors.surface,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          childrenPadding: const EdgeInsets.all(16).copyWith(top: 0),
-          leading: CircleAvatar(
-            radius: 20,
-            backgroundColor: colors.primary.withValues(alpha: 0.1),
-            backgroundImage: item.profile.imagePath != null
-                ? NetworkImage(item.profile.imagePath!)
-                : null,
-            child: item.profile.imagePath == null
-                ? Text(
-                    (item.profile.name.isNotEmpty ? item.profile.name[0] : '?').toUpperCase(),
-                    style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold),
-                  )
-                : null,
-          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          childrenPadding: const EdgeInsets.all(12).copyWith(top: 0),
           title: Text(
-            item.profile.name,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            item.result.examName,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Roll: ${item.profile.classRoll.isNotEmpty ? item.profile.classRoll : "N/A"} | ID: ${item.profile.universityId.isNotEmpty ? item.profile.universityId : "N/A"}',
-                style: TextStyle(fontSize: 11, color: colors.onSurface.withValues(alpha: 0.5)),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'GPA: ${item.result.gpa}',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue),
-                    ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                  child: Text(
+                    'GPA: ${item.result.gpa}',
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'CGPA: ${item.result.cgpa}',
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green),
+                  ),
+                ),
+                if (searchedSubject != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      'CGPA: ${item.result.cgpa}',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
+                      '${searchedSubject.code}: ${searchedSubject.grade}',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: colors.primary),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
-              ),
-              if (searchedSubject != null) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.book_outlined, size: 12, color: colors.primary),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Subject Grade: ${searchedSubject.grade} (${searchedSubject.point})',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colors.primary),
-                    ),
-                  ],
-                ),
               ],
-            ],
+            ),
           ),
           children: [
-            const Divider(),
+            const Divider(height: 1),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  item.result.examName,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.primary),
-                ),
-                Text(
-                  'Reg: ${item.profile.duRegNo.isNotEmpty ? item.profile.duRegNo : "N/A"}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  'Registration No: ${item.profile.duRegNo.isNotEmpty ? item.profile.duRegNo : "N/A"}',
+                  style: TextStyle(fontSize: 10, color: colors.onSurface.withValues(alpha: 0.5)),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ...item.result.subjects.map((sub) => _buildSubjectMiniRow(sub, colors)),
           ],
         ),
