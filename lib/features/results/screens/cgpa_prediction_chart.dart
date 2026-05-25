@@ -428,6 +428,8 @@ class CgpaLineChartPainter extends CustomPainter {
 
     for (int i = 0; i < 8; i++) {
       final Offset pt = projectedPoints[i];
+      final double cgpaVal = i <= lastActualIndex ? (actualCgpas[i] ?? 0.0) : projectedCgpas[i];
+
       if (i <= lastActualIndex) {
         // Actual dot (Solid)
         canvas.drawCircle(pt, 5.5, activeDotPaint);
@@ -436,6 +438,23 @@ class CgpaLineChartPainter extends CustomPainter {
         // Projected dot (Hollow)
         canvas.drawCircle(pt, 4.5, Paint()..color = themeColors.surface..style = PaintingStyle.fill);
         canvas.drawCircle(pt, 4.5, projectedDotPaint);
+      }
+
+      // Draw CGPA number on top of the point
+      if (cgpaVal > 0.0) {
+        textPainter.text = TextSpan(
+          text: cgpaVal.toStringAsFixed(2),
+          style: TextStyle(
+            color: i <= lastActualIndex ? themeColors.primary : themeColors.primary.withValues(alpha: 0.6),
+            fontSize: 8.5,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        textPainter.layout();
+        textPainter.paint(
+          canvas,
+          Offset(pt.dx - textPainter.width / 2, pt.dy - 16),
+        );
       }
     }
   }
