@@ -88,6 +88,33 @@ class ExamResult {
       semester: json['semester'] as int?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'reg_no': regNo,
+      'exam_id': examId,
+      'exam_name': examName,
+      'gpa': gpa,
+      'cgpa': cgpa,
+      'semester': semester,
+      'subjects': subjects.map((s) => s.toJson()).toList(),
+    };
+  }
+
+  factory ExamResult.fromLocalJson(Map<String, dynamic> json) {
+    final subjectsList = json['subjects'] as List? ?? [];
+    return ExamResult(
+      id: json['id'] ?? '',
+      regNo: json['reg_no'] ?? '',
+      examId: json['exam_id'] ?? '',
+      examName: json['exam_name'] ?? '',
+      gpa: json['gpa']?.toString() ?? '',
+      cgpa: json['cgpa']?.toString() ?? '',
+      subjects: subjectsList.map((s) => SubjectResult.fromJson(s as Map<String, dynamic>)).toList(),
+      semester: json['semester'] as int?,
+    );
+  }
 }
 
 class DucmcExam {

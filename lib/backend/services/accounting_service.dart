@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/profile/models/profile_state.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 
 class FeePayment {
   final String id;
@@ -30,6 +33,21 @@ class FeePayment {
   });
 
   factory FeePayment.fromMap(Map<String, dynamic> map) {
+    if (map.containsKey('member_name_raw')) {
+      return FeePayment(
+        id: map['id'] ?? '',
+        memberId: map['member_id'] ?? '',
+        memberName: map['member_name_raw'] ?? 'Unknown Member',
+        memberIdRoll: map['member_id_roll'],
+        amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+        month: map['month'] ?? '',
+        paymentType: map['payment_type'] ?? 'monthly',
+        eventName: map['event_name'],
+        paymentDate: DateTime.parse(map['payment_date'] ?? DateTime.now().toIso8601String()),
+        receivedBy: map['received_by'] ?? '',
+        remarks: map['remarks'],
+      );
+    }
     final memberProfile = map['profiles_member'] as Map<String, dynamic>?;
     final String firstName = memberProfile?['first_name'] ?? '';
     final String lastName = memberProfile?['last_name'] ?? '';
@@ -61,6 +79,22 @@ class FeePayment {
       remarks: map['remarks'],
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'member_id': memberId,
+      'member_name_raw': memberName,
+      'member_id_roll': memberIdRoll,
+      'amount': amount,
+      'month': month,
+      'payment_type': paymentType,
+      'event_name': eventName,
+      'payment_date': paymentDate.toIso8601String(),
+      'received_by': receivedBy,
+      'remarks': remarks,
+    };
+  }
 }
 
 class ClubExpense {
@@ -87,6 +121,19 @@ class ClubExpense {
   });
 
   factory ClubExpense.fromMap(Map<String, dynamic> map) {
+    if (map.containsKey('recorded_by_name_raw')) {
+      return ClubExpense(
+        id: map['id'] ?? '',
+        amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+        category: map['category'] ?? 'monthly',
+        expenseDate: DateTime.parse(map['expense_date'] ?? DateTime.now().toIso8601String()),
+        description: map['description'] ?? '',
+        eventName: map['event_name'],
+        recordedBy: map['recorded_by'] ?? '',
+        recordedByName: map['recorded_by_name_raw'] ?? 'Unknown Admin',
+        remarks: map['remarks'],
+      );
+    }
     final recorderProfile = map['profiles_recorder'] as Map<String, dynamic>?;
     final String firstName = recorderProfile?['first_name'] ?? '';
     final String lastName = recorderProfile?['last_name'] ?? '';
@@ -105,6 +152,20 @@ class ClubExpense {
       remarks: map['remarks'],
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'amount': amount,
+      'category': category,
+      'expense_date': expenseDate.toIso8601String(),
+      'description': description,
+      'event_name': eventName,
+      'recorded_by': recordedBy,
+      'recorded_by_name_raw': recordedByName,
+      'remarks': remarks,
+    };
+  }
 }
 
 class MemberDuesStatus {
@@ -119,6 +180,26 @@ class MemberDuesStatus {
     this.paidAmount,
     this.paymentDate,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'profile': profile.toJson(),
+      'is_paid': isPaid,
+      'paid_amount': paidAmount,
+      'payment_date': paymentDate?.toIso8601String(),
+    };
+  }
+
+  factory MemberDuesStatus.fromMap(Map<String, dynamic> map) {
+    return MemberDuesStatus(
+      profile: ProfileData.fromJson(map['profile'] as Map<String, dynamic>),
+      isPaid: map['is_paid'] ?? false,
+      paidAmount: (map['paid_amount'] as num?)?.toDouble(),
+      paymentDate: map['payment_date'] != null
+          ? DateTime.parse(map['payment_date'] as String)
+          : null,
+    );
+  }
 }
 
 class AccountingSummary {
@@ -135,6 +216,30 @@ class AccountingSummary {
     required this.recentPayments,
     required this.recentExpenses,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'total_collection': totalCollection,
+      'total_expenses': totalExpenses,
+      'current_balance': currentBalance,
+      'recent_payments': recentPayments.map((e) => e.toMap()).toList(),
+      'recent_expenses': recentExpenses.map((e) => e.toMap()).toList(),
+    };
+  }
+
+  factory AccountingSummary.fromMap(Map<String, dynamic> map) {
+    return AccountingSummary(
+      totalCollection: (map['total_collection'] as num?)?.toDouble() ?? 0.0,
+      totalExpenses: (map['total_expenses'] as num?)?.toDouble() ?? 0.0,
+      currentBalance: (map['current_balance'] as num?)?.toDouble() ?? 0.0,
+      recentPayments: ((map['recent_payments'] as List?) ?? [])
+          .map((e) => FeePayment.fromMap(e as Map<String, dynamic>))
+          .toList(),
+      recentExpenses: ((map['recent_expenses'] as List?) ?? [])
+          .map((e) => ClubExpense.fromMap(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 class AccountingService {
@@ -142,6 +247,27 @@ class AccountingService {
 
   // Fetch full summary of collections and expenses
   static Future<AccountingSummary> fetchAccountingSummary() async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedStr = await DatabaseHelper.instance.getCache('accounting_summary');
+      if (cachedStr != null) {
+        try {
+          final map = json.decode(cachedStr) as Map<String, dynamic>;
+          debugPrint('Successfully loaded accounting summary from local SQLite database.');
+          return AccountingSummary.fromMap(map);
+        } catch (e) {
+          debugPrint('Error deserializing cached accounting summary: $e');
+        }
+      }
+      return AccountingSummary(
+        totalCollection: 0.0,
+        totalExpenses: 0.0,
+        currentBalance: 0.0,
+        recentPayments: [],
+        recentExpenses: [],
+      );
+    }
+
     try {
       // 1. Fetch all collections to sum up
       final feesRes = await _client.from('club_member_fees').select('amount');
@@ -179,13 +305,18 @@ class AccountingService {
           .map((data) => ClubExpense.fromMap(data))
           .toList();
 
-      return AccountingSummary(
+      final summary = AccountingSummary(
         totalCollection: totalCollection,
         totalExpenses: totalExpenses,
         currentBalance: totalCollection - totalExpenses,
         recentPayments: recentPayments,
         recentExpenses: recentExpenses,
       );
+
+      // Save to SQLite Cache
+      await DatabaseHelper.instance.saveCache('accounting_summary', json.encode(summary.toMap()));
+
+      return summary;
     } catch (e) {
       debugPrint('Error fetching accounting summary: $e');
       rethrow;
@@ -194,6 +325,23 @@ class AccountingService {
 
   // Fetch paid vs unpaid dues status of all club members for a target month (format: 'YYYY-MM')
   static Future<List<MemberDuesStatus>> fetchDuesStatus(String targetMonth) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    final cacheKey = 'accounting_dues_$targetMonth';
+    
+    if (!isOnline) {
+      final cachedStr = await DatabaseHelper.instance.getCache(cacheKey);
+      if (cachedStr != null) {
+        try {
+          final List decoded = json.decode(cachedStr);
+          debugPrint('Successfully loaded dues status ($targetMonth) from local SQLite database.');
+          return decoded.map((e) => MemberDuesStatus.fromMap(e as Map<String, dynamic>)).toList();
+        } catch (e) {
+          debugPrint('Error deserializing cached dues status ($targetMonth): $e');
+        }
+      }
+      return [];
+    }
+
     try {
       // 1. Fetch all approved active club profiles (exclude alumni)
       final profilesRes = await _client
@@ -261,6 +409,10 @@ class AccountingService {
         ));
       }
 
+      // Save to SQLite Cache
+      final listToCache = result.map((e) => e.toMap()).toList();
+      await DatabaseHelper.instance.saveCache(cacheKey, json.encode(listToCache));
+
       return result;
     } catch (e) {
       debugPrint('Error fetching dues status for month $targetMonth: $e');
@@ -277,6 +429,12 @@ class AccountingService {
     String? eventName,
     String? remarks,
   }) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to record fee payments.');
+      throw Exception('Network connection required');
+    }
+
     try {
       final currentUserId = _client.auth.currentUser?.id;
       if (currentUserId == null) throw Exception('No authenticated admin found.');
@@ -305,6 +463,12 @@ class AccountingService {
     String? remarks,
     required DateTime expenseDate,
   }) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to record club expenses.');
+      throw Exception('Network connection required');
+    }
+
     try {
       final currentUserId = _client.auth.currentUser?.id;
       if (currentUserId == null) throw Exception('No authenticated admin found.');
@@ -324,3 +488,4 @@ class AccountingService {
     }
   }
 }
+

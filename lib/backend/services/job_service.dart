@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/jobs/models/job_state.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 import 'notification_service.dart';
 
 class JobService {
@@ -15,6 +19,23 @@ class JobService {
   static List<JobItem> get jobItems => _jobItems;
 
   static Future<List<JobItem>> fetchJobs({bool forceRefresh = false}) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedJobsStr = await DatabaseHelper.instance.getCache('jobs');
+      if (cachedJobsStr != null) {
+        try {
+          final List decoded = json.decode(cachedJobsStr);
+          _jobItems = decoded.map((row) => JobItem.fromJson(row)).toList();
+          _jobsStreamController.add(_jobItems);
+          debugPrint('Successfully loaded jobs from local SQLite database.');
+          return _jobItems;
+        } catch (e) {
+          debugPrint('Error deserializing cached jobs: $e');
+        }
+      }
+      return _jobItems;
+    }
+
     if (!forceRefresh && !CacheService.isStale(CacheKeys.jobsRecommended)) return _jobItems;
     
     final isAdmin = currentProfile.value.role != UserRole.student;
@@ -29,10 +50,19 @@ class JobService {
 
     _jobsStreamController.add(_jobItems);
     CacheService.markFresh(CacheKeys.jobsRecommended);
+
+    // Save to SQLite
+    await DatabaseHelper.instance.saveCache('jobs', json.encode(response));
+
     return _jobItems;
   }
 
   static Future<void> addJobToDB(JobItem job) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to post jobs.');
+      throw Exception('Network connection required');
+    }
     final profile = currentProfile.value;
     final isSuperUser = profile.designation == 'President' || profile.designation == 'Vice President';
     
@@ -54,6 +84,11 @@ class JobService {
   }
 
   static Future<void> updateJobInDB(JobItem job) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to update jobs.');
+      throw Exception('Network connection required');
+    }
     final data = job.toJson();
     data.remove('is_approved'); // Don't overwrite existing status on normal edit
     
@@ -67,18 +102,33 @@ class JobService {
   }
 
   static Future<void> approveJob(String id) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to approve jobs.');
+      throw Exception('Network connection required');
+    }
     await _client.from('jobs').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.jobsRecommended);
     await fetchJobs(forceRefresh: true);
   }
 
   static Future<void> toggleJobVisibility(String id, bool isVisible) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to toggle job visibility.');
+      throw Exception('Network connection required');
+    }
     await _client.from('jobs').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.jobsRecommended);
     await fetchJobs(forceRefresh: true);
   }
 
   static Future<void> deleteJobFromDB(String id) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete jobs.');
+      throw Exception('Network connection required');
+    }
     await _client
         .from('jobs')
         .delete()

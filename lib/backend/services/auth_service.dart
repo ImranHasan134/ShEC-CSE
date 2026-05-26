@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../core/services/storage_service.dart';
-
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 
 class AuthService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -29,6 +31,12 @@ class AuthService {
     String universityId = '',
     String classRoll = '',
   }) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to create an account.');
+      throw Exception('Network connection required');
+    }
+
     final AuthResponse res = await _client.auth.signUp(
       email: email,
       password: password,
@@ -59,55 +67,111 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to log in.');
+      throw Exception('Network connection required');
+    }
     await _client.auth.signInWithPassword(email: email, password: password);
   }
 
   static Future<void> signOut() async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to log out.');
+      throw Exception('Network connection required');
+    }
     await _client.auth.signOut();
   }
 
   static Future<void> fetchCurrentUserProfile() async {
     final user = _client.auth.currentUser;
-    if (user != null) {
-      try {
-        final data = await _client
-            .from('profiles')
-            .select()
-            .eq('id', user.id)
-            .single();
+    if (user == null) return;
 
-        UserRole parsedRole;
-        switch (data['role']) {
-          case 'superuser': parsedRole = UserRole.superUser; break;
-          case 'committee': parsedRole = UserRole.committeeMember; break;
-          default: parsedRole = UserRole.student; break;
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      // Offline: Try loading from local SQLite database cache
+      final cachedProfileStr = await DatabaseHelper.instance.getCache('current_profile');
+      if (cachedProfileStr != null) {
+        try {
+          final decoded = json.decode(cachedProfileStr);
+          currentProfile.value = ProfileData.fromJson(decoded);
+          debugPrint('Successfully loaded user profile from local SQLite database.');
+          return;
+        } catch (e) {
+          debugPrint('Error deserializing cached profile: $e');
         }
+      }
+    }
 
-        currentProfile.value = ProfileData(
-          id: data['id'],
-          firstName: data['first_name'] ?? '',
-          lastName: data['last_name'] ?? '',
-          name: '${data['first_name']} ${data['last_name']}',
-          email: user.email ?? '',
-          universityId: data['university_id'] ?? '',
-          classRoll: data['class_roll'] ?? '',
-          duRegNo: data['du_reg'] ?? '',
-          session: data['session'] ?? '',
-          batch: data['batch'] ?? '',
-          phone: data['phone'] ?? '',
-          imagePath: data['profile_pic'],
-          role: parsedRole,
-          designation: data['designation'] ?? 'Student',
-          isApproved: data['is_approved'] ?? false,
-          isAlumni: data['is_alumni'] ?? false,
-        );
-      } catch (e) {
-        debugPrint('Error fetching user profile: $e');
+    try {
+      final data = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .single();
+
+      UserRole parsedRole;
+      switch (data['role']) {
+        case 'superuser': parsedRole = UserRole.superUser; break;
+        case 'committee': parsedRole = UserRole.committeeMember; break;
+        default: parsedRole = UserRole.student; break;
+      }
+
+      final profile = ProfileData(
+        id: data['id'],
+        firstName: data['first_name'] ?? '',
+        lastName: data['last_name'] ?? '',
+        name: '${data['first_name']} ${data['last_name']}',
+        email: user.email ?? '',
+        universityId: data['university_id'] ?? '',
+        classRoll: data['class_roll'] ?? '',
+        duRegNo: data['du_reg'] ?? '',
+        session: data['session'] ?? '',
+        batch: data['batch'] ?? '',
+        phone: data['phone'] ?? '',
+        imagePath: data['profile_pic'],
+        role: parsedRole,
+        designation: data['designation'] ?? 'Student',
+        isApproved: data['is_approved'] ?? false,
+        isAlumni: data['is_alumni'] ?? false,
+      );
+
+      currentProfile.value = profile;
+
+      // Cache this profile string in SQLite
+      await DatabaseHelper.instance.saveCache(
+        'current_profile',
+        json.encode(profile.toJson()),
+      );
+    } catch (e) {
+      debugPrint('Error fetching user profile: $e');
+      // If network call failed, attempt to fall back to SQLite cache as a last resort
+      final cachedProfileStr = await DatabaseHelper.instance.getCache('current_profile');
+      if (cachedProfileStr != null) {
+        try {
+          final decoded = json.decode(cachedProfileStr);
+          currentProfile.value = ProfileData.fromJson(decoded);
+        } catch (_) {}
       }
     }
   }
 
   static Future<List<ProfileData>> fetchAllMembers() async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedMembersStr = await DatabaseHelper.instance.getCache('all_members');
+      if (cachedMembersStr != null) {
+        try {
+          final List decoded = json.decode(cachedMembersStr);
+          return decoded.map((m) => ProfileData.fromJson(m)).toList();
+        } catch (e) {
+          debugPrint('Error loading cached members: $e');
+        }
+      }
+      return [];
+    }
+
     final response = await _client
         .from('profiles')
         .select()
@@ -142,10 +206,23 @@ class AuthService {
         isAlumni: data['is_alumni'] ?? false,
       ));
     }
+
+    // Cache the complete members list in SQLite
+    await DatabaseHelper.instance.saveCache(
+      'all_members',
+      json.encode(members.map((m) => m.toJson()).toList()),
+    );
+
     return members;
   }
 
   static Future<void> updateUserRole(String userId, UserRole newRole, {String? designation}) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to modify member privileges.');
+      throw Exception('Network connection required');
+    }
+
     String roleString;
     switch (newRole) {
       case UserRole.superUser: roleString = 'superuser'; break;
@@ -165,6 +242,12 @@ class AuthService {
   }
 
   static Future<void> updateAnyProfile(ProfileData profile) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to update profile details.');
+      throw Exception('Network connection required');
+    }
+
     await _client.from('profiles').update({
       'first_name': profile.firstName,
       'last_name': profile.lastName,
@@ -179,10 +262,20 @@ class AuthService {
   }
 
   static Future<void> approveUser(String userId) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to approve members.');
+      throw Exception('Network connection required');
+    }
     await _client.from('profiles').update({'is_approved': true}).eq('id', userId);
   }
 
   static Future<void> deleteUser(String userId) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete accounts.');
+      throw Exception('Network connection required');
+    }
     try {
       // 1. Fetch profile to get image path
       final data = await _client.from('profiles').select('profile_pic').eq('id', userId).single();
@@ -212,6 +305,11 @@ class AuthService {
   }
 
   static Future<void> moveToAlumni(ProfileData member) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to transfer member to Alumni directory.');
+      throw Exception('Network connection required');
+    }
     await _client.from('profiles').update({
       'is_alumni': true,
       'role': 'member',

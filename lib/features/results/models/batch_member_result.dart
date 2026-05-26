@@ -9,4 +9,18 @@ class BatchMemberResult {
     required this.profile,
     required this.result,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'profile': profile.toJson(),
+      'result': result.toJson(),
+    };
+  }
+
+  factory BatchMemberResult.fromJson(Map<String, dynamic> json) {
+    return BatchMemberResult(
+      profile: ProfileData.fromJson(json['profile'] as Map<String, dynamic>),
+      result: ExamResult.fromLocalJson(json['result'] as Map<String, dynamic>),
+    );
+  }
 }

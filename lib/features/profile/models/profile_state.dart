@@ -85,6 +85,55 @@ class ProfileData {
       isAlumni: isAlumni ?? this.isAlumni,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'first_name': firstName,
+      'last_name': lastName,
+      'name': name,
+      'email': email,
+      'university_id': universityId,
+      'class_roll': classRoll,
+      'du_reg': duRegNo,
+      'session': session,
+      'batch': batch,
+      'phone': phone,
+      'profile_pic': imagePath,
+      'role': role == UserRole.superUser ? 'superuser' : (role == UserRole.committeeMember ? 'committee' : 'member'),
+      'designation': designation,
+      'is_approved': isApproved,
+      'is_alumni': isAlumni,
+    };
+  }
+
+  factory ProfileData.fromJson(Map<String, dynamic> json) {
+    UserRole parsedRole;
+    switch (json['role']) {
+      case 'superuser': parsedRole = UserRole.superUser; break;
+      case 'committee': parsedRole = UserRole.committeeMember; break;
+      default: parsedRole = UserRole.student; break;
+    }
+
+    return ProfileData(
+      id: json['id'] ?? '',
+      firstName: json['first_name'] ?? '',
+      lastName: json['last_name'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      universityId: json['university_id'] ?? '',
+      classRoll: json['class_roll'] ?? '',
+      duRegNo: json['du_reg'] ?? '',
+      session: json['session'] ?? '',
+      batch: json['batch'] ?? '',
+      phone: json['phone'] ?? '',
+      imagePath: json['profile_pic'],
+      role: parsedRole,
+      designation: json['designation'] ?? 'Student',
+      isApproved: json['is_approved'] ?? false,
+      isAlumni: json['is_alumni'] ?? false,
+    );
+  }
 }
 
 final ValueNotifier<ProfileData> currentProfile = ValueNotifier(

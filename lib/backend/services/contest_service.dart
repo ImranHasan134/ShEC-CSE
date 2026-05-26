@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/contests/models/contest_state.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 import 'notification_service.dart';
 
 class ContestService {
@@ -15,6 +19,23 @@ class ContestService {
   static List<ContestItem> get contestItems => _contestItems;
 
   static Future<List<ContestItem>> fetchContestsAndCourses({bool forceRefresh = false}) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedContestsStr = await DatabaseHelper.instance.getCache('contests');
+      if (cachedContestsStr != null) {
+        try {
+          final List decoded = json.decode(cachedContestsStr);
+          _contestItems = decoded.map((row) => ContestItem.fromJson(row)).toList();
+          _contestStreamController.add(_contestItems);
+          debugPrint('Successfully loaded contests from local SQLite database.');
+          return _contestItems;
+        } catch (e) {
+          debugPrint('Error deserializing cached contests: $e');
+        }
+      }
+      return _contestItems;
+    }
+
     if (!forceRefresh && !CacheService.isStale(CacheKeys.contests)) return _contestItems;
 
     final isAdmin = currentProfile.value.role != UserRole.student;
@@ -29,10 +50,19 @@ class ContestService {
 
     _contestStreamController.add(_contestItems);
     CacheService.markFresh(CacheKeys.contests);
+
+    // Save to SQLite
+    await DatabaseHelper.instance.saveCache('contests', json.encode(response));
+
     return _contestItems;
   }
 
   static Future<void> addContestToDB(ContestItem item) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to create coding contests.');
+      throw Exception('Network connection required');
+    }
     final profile = currentProfile.value;
     final isSuperUser = profile.designation == 'President' || profile.designation == 'Vice President';
     
@@ -54,12 +84,22 @@ class ContestService {
   }
 
   static Future<void> toggleContestVisibility(String id, bool isVisible) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to toggle contest visibility.');
+      throw Exception('Network connection required');
+    }
     await _client.from('contests').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.contests);
     await fetchContestsAndCourses(forceRefresh: true);
   }
 
   static Future<void> updateContestInDB(ContestItem item) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to update contests.');
+      throw Exception('Network connection required');
+    }
     final profile = currentProfile.value;
     final isSuperUser = profile.designation == 'President' || profile.designation == 'Vice President';
     
@@ -79,12 +119,22 @@ class ContestService {
   }
 
   static Future<void> approveContest(String id) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to approve contests.');
+      throw Exception('Network connection required');
+    }
     await _client.from('contests').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.contests);
     await fetchContestsAndCourses(forceRefresh: true);
   }
 
   static Future<void> deleteContestFromDB(ContestItem item) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete contests.');
+      throw Exception('Network connection required');
+    }
     await _client
         .from('contests')
         .delete()

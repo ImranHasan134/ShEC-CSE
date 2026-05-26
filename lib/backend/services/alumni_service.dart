@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/alumni/models/alumni_state.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 
 class AlumniService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -17,6 +20,23 @@ class AlumniService {
   static List<AlumniItem> get alumniItems => _alumniItems;
 
   static Future<List<AlumniItem>> fetchAlumni({bool forceRefresh = false}) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedAlumniStr = await DatabaseHelper.instance.getCache('alumni');
+      if (cachedAlumniStr != null) {
+        try {
+          final List decoded = json.decode(cachedAlumniStr);
+          _alumniItems = decoded.map((e) => AlumniItem.fromJson(e)).toList();
+          _alumniStreamController.add(_alumniItems);
+          debugPrint('Successfully loaded alumni from local SQLite database.');
+          return _alumniItems;
+        } catch (e) {
+          debugPrint('Error deserializing cached alumni: $e');
+        }
+      }
+      return _alumniItems;
+    }
+
     if (!forceRefresh && !CacheService.isStale(CacheKeys.alumni)) return _alumniItems;
 
     try {
@@ -29,6 +49,9 @@ class AlumniService {
       _alumniItems = (response as List).map((e) => AlumniItem.fromJson(e)).toList();
       CacheService.markFresh(CacheKeys.alumni);
       _alumniStreamController.add(_alumniItems);
+
+      // Save to SQLite
+      await DatabaseHelper.instance.saveCache('alumni', json.encode(response));
     } catch (e) {
       debugPrint('Error fetching alumni: $e');
     }
@@ -36,6 +59,11 @@ class AlumniService {
   }
 
   static Future<void> addAlumni(AlumniItem item) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to add alumni profiles.');
+      throw Exception('Network connection required');
+    }
     final profile = currentProfile.value;
     final isSuperUser = profile.designation == 'President' || profile.designation == 'Vice President';
 
@@ -51,6 +79,11 @@ class AlumniService {
   }
 
   static Future<void> updateAlumni(AlumniItem item) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to update alumni profiles.');
+      throw Exception('Network connection required');
+    }
     final data = item.toJson();
     data.remove('is_approved');
     await _client.from('alumni').update(data).eq('id', item.id);
@@ -59,18 +92,33 @@ class AlumniService {
   }
 
   static Future<void> approveAlumni(String id) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to approve alumni.');
+      throw Exception('Network connection required');
+    }
     await _client.from('alumni').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.alumni);
     await fetchAlumni(forceRefresh: true);
   }
 
   static Future<void> toggleAlumniVisibility(String id, bool isVisible) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to toggle alumni visibility.');
+      throw Exception('Network connection required');
+    }
     await _client.from('alumni').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.alumni);
     await fetchAlumni(forceRefresh: true);
   }
 
   static Future<void> deleteAlumni(AlumniItem alumni) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete alumni.');
+      throw Exception('Network connection required');
+    }
     try {
       // 1. Delete image from storage
       if (alumni.imagePath.isNotEmpty) {
@@ -91,6 +139,11 @@ class AlumniService {
 
   /// Promote a club member to alumni (superuser only)
   static Future<void> promoteToAlumni(String memberId, AlumniItem alumniData) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to promote members to alumni.');
+      throw Exception('Network connection required');
+    }
     try {
       // 1. Insert into alumni table
       await addAlumni(alumniData);
@@ -111,6 +164,11 @@ class AlumniService {
   }
 
   static Future<String?> uploadImage(File file) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to upload alumni images.');
+      throw Exception('Network connection required');
+    }
     return StorageService.uploadFile(file, 'alumni_images');
   }
 }

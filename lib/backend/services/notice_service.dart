@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/notices/models/notice_state.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../core/services/cache_service.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 import 'package:ShEC_CSE/backend/services/notification_service.dart';
 
 class NoticeService {
@@ -20,6 +23,37 @@ class NoticeService {
   static List<NoticeItem> get deptNotices => _deptNotices;
 
   static Future<({List<NoticeItem> club, List<NoticeItem> dept})> fetchNotices({bool forceRefresh = false}) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    
+    if (!isOnline) {
+      // Offline: Try loading from local SQLite database cache
+      final cachedNoticesStr = await DatabaseHelper.instance.getCache('notices');
+      if (cachedNoticesStr != null) {
+        try {
+          final List decoded = json.decode(cachedNoticesStr);
+          final List<NoticeItem> clubList = [];
+          final List<NoticeItem> deptList = [];
+          for (var row in decoded) {
+            final item = NoticeItem.fromJson(row);
+            if (row['category'] == 'club') {
+              clubList.add(item);
+            } else {
+              deptList.add(item);
+            }
+          }
+          _clubNotices = clubList;
+          _deptNotices = deptList;
+          final result = (club: _clubNotices, dept: _deptNotices);
+          _noticesStreamController.add(result);
+          debugPrint('Successfully loaded notices from local SQLite database.');
+          return result;
+        } catch (e) {
+          debugPrint('Error deserializing cached notices: $e');
+        }
+      }
+      return (club: _clubNotices, dept: _deptNotices);
+    }
+
     if (!forceRefresh && !CacheService.isStale(CacheKeys.notices)) {
       return (club: _clubNotices, dept: _deptNotices);
     }
@@ -50,16 +84,30 @@ class NoticeService {
     _clubNotices = clubList;
     _deptNotices = deptList;
     CacheService.markFresh(CacheKeys.notices);
+    
+    // Save the list response map in SQLite cache
+    await DatabaseHelper.instance.saveCache('notices', json.encode(response));
+
     final result = (club: _clubNotices, dept: _deptNotices);
     _noticesStreamController.add(result);
     return result;
   }
 
   static Future<String?> uploadImage(File file) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to upload notice images.');
+      throw Exception('Network connection required');
+    }
     return StorageService.uploadFile(file, 'notice_images');
   }
 
   static Future<void> addNoticeToDB(NoticeItem notice, String category) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to publish notices.');
+      throw Exception('Network connection required');
+    }
     final profile = currentProfile.value;
     final isSuperUser = profile.designation == 'President' || profile.designation == 'Vice President';
     
@@ -100,6 +148,11 @@ class NoticeService {
   }
 
   static Future<void> updateNoticeInDB(NoticeItem notice, String category) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to update notices.');
+      throw Exception('Network connection required');
+    }
     final profile = currentProfile.value;
     final isSuperUser = profile.designation == 'President' || profile.designation == 'Vice President';
     
@@ -124,12 +177,22 @@ class NoticeService {
   }
 
   static Future<void> toggleNoticePin(String id, bool isPinned) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to pin notices.');
+      throw Exception('Network connection required');
+    }
     await _client.from('notices').update({'is_pinned': isPinned}).eq('id', id);
     CacheService.invalidate(CacheKeys.notices);
     fetchNotices(forceRefresh: true);
   }
 
   static Future<void> deleteNoticeFromDB(NoticeItem notice, String category) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete notices.');
+      throw Exception('Network connection required');
+    }
     try {
       // 1. Delete Image from Storage if exists
       if (notice.imagePath != null && notice.imagePath!.isNotEmpty) {
@@ -153,12 +216,22 @@ class NoticeService {
   }
 
   static Future<void> approveNotice(String id) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to approve notices.');
+      throw Exception('Network connection required');
+    }
     await _client.from('notices').update({'is_approved': true}).eq('id', id);
     CacheService.invalidate(CacheKeys.notices);
     fetchNotices(forceRefresh: true);
   }
 
   static Future<void> toggleNoticeVisibility(String id, bool isVisible) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to toggle notice visibility.');
+      throw Exception('Network connection required');
+    }
     await _client.from('notices').update({'is_visible': isVisible}).eq('id', id);
     CacheService.invalidate(CacheKeys.notices);
     fetchNotices(forceRefresh: true);

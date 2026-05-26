@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/profile/models/profile_state.dart';
 import '../../features/results/models/result_state.dart';
 import '../../features/results/models/batch_member_result.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/connectivity_service.dart';
 import 'result_scraper_service.dart';
 
 class ResultService {
@@ -13,6 +16,22 @@ class ResultService {
     final profile = currentProfile.value;
     if (profile.id.isEmpty) {
       debugPrint('Skipping results load: Profile ID is empty');
+      return [];
+    }
+
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedResultsStr = await DatabaseHelper.instance.getCache('personal_results');
+      if (cachedResultsStr != null) {
+        try {
+          final List decoded = json.decode(cachedResultsStr);
+          final list = decoded.map((r) => ExamResult.fromLocalJson(r)).toList();
+          debugPrint('Successfully loaded personal results from local SQLite cache.');
+          return list;
+        } catch (e) {
+          debugPrint('Error deserializing cached results: $e');
+        }
+      }
       return [];
     }
 
@@ -38,15 +57,44 @@ class ResultService {
         examResults.add(ExamResult.fromDB(resultRow, subjects));
       }
 
+      // Save to SQLite
+      await DatabaseHelper.instance.saveCache(
+        'personal_results', 
+        json.encode(examResults.map((r) => r.toJson()).toList()),
+      );
+
       return examResults;
     } catch (e) {
       debugPrint('Error loading results: $e');
+      final cachedResultsStr = await DatabaseHelper.instance.getCache('personal_results');
+      if (cachedResultsStr != null) {
+        try {
+          final List decoded = json.decode(cachedResultsStr);
+          return decoded.map((r) => ExamResult.fromLocalJson(r)).toList();
+        } catch (_) {}
+      }
       rethrow;
     }
   }
 
   // 1b. Load results for all members of a batch (session)
   static Future<List<BatchMemberResult>> loadBatchResults(String session) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      final cachedBatchStr = await DatabaseHelper.instance.getCache('batch_results_$session');
+      if (cachedBatchStr != null) {
+        try {
+          final List decoded = json.decode(cachedBatchStr);
+          final list = decoded.map((e) => BatchMemberResult.fromJson(e)).toList();
+          debugPrint('Successfully loaded batch results from SQLite cache.');
+          return list;
+        } catch (e) {
+          debugPrint('Error deserializing cached batch results: $e');
+        }
+      }
+      return [];
+    }
+
     try {
       debugPrint('Loading batch results for session: $session');
       // Fetch profiles in the same session
@@ -107,8 +155,7 @@ class ResultService {
         final userId = resultRow['user_id'];
         final profile = profiles.firstWhere((p) => p.id == userId, orElse: () => currentProfile.value);
         if (profile.id.isEmpty || profile.id == currentProfile.value.id) {
-          // If profile is not found or it's the current user (wait, let's keep current user as well,
-          // so they can see all batch members including themselves, which is excellent!)
+          // If profile is not found or it's the current user
         }
 
         final List<dynamic> subjectsRaw = resultRow['subject_results'] ?? [];
@@ -120,9 +167,22 @@ class ResultService {
         batchResults.add(BatchMemberResult(profile: profile, result: examResult));
       }
 
+      // Save to SQLite
+      await DatabaseHelper.instance.saveCache(
+        'batch_results_$session', 
+        json.encode(batchResults.map((e) => e.toJson()).toList()),
+      );
+
       return batchResults;
     } catch (e) {
       debugPrint('Error loading batch results: $e');
+      final cachedBatchStr = await DatabaseHelper.instance.getCache('batch_results_$session');
+      if (cachedBatchStr != null) {
+        try {
+          final List decoded = json.decode(cachedBatchStr);
+          return decoded.map((e) => BatchMemberResult.fromJson(e)).toList();
+        } catch (_) {}
+      }
       return [];
     }
   }
