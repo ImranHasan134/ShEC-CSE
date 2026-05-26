@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../backend/services/accounting_service.dart';
 import '../bloc/accounting_bloc.dart';
 import '../bloc/accounting_state.dart';
+import '../bloc/accounting_event.dart';
 import '../../../profile/models/profile_state.dart';
 import 'payment_dialogs.dart';
 
@@ -24,6 +25,10 @@ class _ExpenseLoggerTabState extends State<ExpenseLoggerTab> {
         designation == 'Vice President';
   }
 
+  bool _isCreator(ClubExpense expense) {
+    return currentProfile.value.id == expense.recordedBy;
+  }
+
   void _showAddExpenseDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -32,6 +37,52 @@ class _ExpenseLoggerTabState extends State<ExpenseLoggerTab> {
         return BlocProvider.value(
           value: context.read<AccountingBloc>(),
           child: const AddExpenseDialog(),
+        );
+      },
+    );
+  }
+
+  void _showEditExpenseDialog(BuildContext context, ClubExpense expense) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: context.read<AccountingBloc>(),
+          child: EditExpenseDialog(expense: expense),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, ClubExpense expense) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Delete Expense Log?'),
+          content: Text(
+              'Are you sure you want to delete the expense of ৳ ${expense.amount.toStringAsFixed(0)} logged for "${expense.description}"? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                context.read<AccountingBloc>().add(DeleteExpenseSubmitted(expense.id));
+                Navigator.pop(dialogContext);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
         );
       },
     );
@@ -121,7 +172,7 @@ class _ExpenseLoggerTabState extends State<ExpenseLoggerTab> {
                         color: colors.surfaceContainerLowest,
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          contentPadding: const EdgeInsets.only(left: 16, right: 8, top: 8, bottom: 8),
                           title: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -186,6 +237,41 @@ class _ExpenseLoggerTabState extends State<ExpenseLoggerTab> {
                               ),
                             ],
                           ),
+                          trailing: _isCreator(exp)
+                              ? PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  onSelected: (value) {
+                                    if (value == 'edit') {
+                                      _showEditExpenseDialog(context, exp);
+                                    } else if (value == 'delete') {
+                                      _showDeleteConfirmationDialog(context, exp);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.edit_outlined, size: 18),
+                                          SizedBox(width: 8),
+                                          Text('Edit'),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                          const SizedBox(width: 8),
+                                          Text('Delete', style: TextStyle(color: colors.error)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : null,
                         ),
                       );
                     },

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../backend/services/accounting_service.dart';
 import '../bloc/accounting_bloc.dart';
 import '../bloc/accounting_state.dart';
+import '../bloc/accounting_event.dart';
 import '../../../profile/models/profile_state.dart';
 import 'payment_dialogs.dart';
 
@@ -26,6 +27,10 @@ class _FeeTrackerTabState extends State<FeeTrackerTab> {
         designation == 'Vice President';
   }
 
+  bool _isCreator(FeePayment payment) {
+    return currentProfile.value.id == payment.receivedBy;
+  }
+
   void _showAddPaymentDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -34,6 +39,52 @@ class _FeeTrackerTabState extends State<FeeTrackerTab> {
         return BlocProvider.value(
           value: context.read<AccountingBloc>(),
           child: const AddPaymentDialog(),
+        );
+      },
+    );
+  }
+
+  void _showEditPaymentDialog(BuildContext context, FeePayment payment) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: context.read<AccountingBloc>(),
+          child: EditPaymentDialog(payment: payment),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, FeePayment payment) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Delete Fee Payment?'),
+          content: Text(
+              'Are you sure you want to remove this fee payment of ৳ ${payment.amount.toStringAsFixed(0)} recorded for ${payment.memberName}? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                context.read<AccountingBloc>().add(DeleteFeePaymentSubmitted(payment.id));
+                Navigator.pop(dialogContext);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
         );
       },
     );
@@ -95,7 +146,7 @@ class _FeeTrackerTabState extends State<FeeTrackerTab> {
                         color: colors.surfaceContainerLowest,
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          contentPadding: const EdgeInsets.only(left: 16, right: 8, top: 6, bottom: 6),
                           title: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -150,6 +201,41 @@ class _FeeTrackerTabState extends State<FeeTrackerTab> {
                               ]
                             ],
                           ),
+                          trailing: _isCreator(payment)
+                              ? PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  onSelected: (value) {
+                                    if (value == 'edit') {
+                                      _showEditPaymentDialog(context, payment);
+                                    } else if (value == 'delete') {
+                                      _showDeleteConfirmationDialog(context, payment);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.edit_outlined, size: 18),
+                                          SizedBox(width: 8),
+                                          Text('Edit'),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                          const SizedBox(width: 8),
+                                          Text('Delete', style: TextStyle(color: colors.error)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : null,
                         ),
                       );
                     },

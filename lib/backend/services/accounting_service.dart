@@ -487,5 +487,97 @@ class AccountingService {
       rethrow;
     }
   }
+
+  // Update a fee payment
+  static Future<void> updateFeePayment({
+    required String paymentId,
+    required double amount,
+    required String month,
+    required String paymentType,
+    String? eventName,
+    String? remarks,
+  }) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to edit fee payments.');
+      throw Exception('Network connection required');
+    }
+
+    try {
+      await _client.from('club_member_fees').update({
+        'amount': amount,
+        'month': month,
+        'payment_type': paymentType,
+        'event_name': eventName,
+        'remarks': remarks,
+      }).eq('id', paymentId);
+    } catch (e) {
+      debugPrint('Error updating fee payment: $e');
+      rethrow;
+    }
+  }
+
+  // Delete a fee payment
+  static Future<void> deleteFeePayment(String paymentId) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete fee payments.');
+      throw Exception('Network connection required');
+    }
+
+    try {
+      await _client.from('club_member_fees').delete().eq('id', paymentId);
+    } catch (e) {
+      debugPrint('Error deleting fee payment: $e');
+      rethrow;
+    }
+  }
+
+  // Update an expense
+  static Future<void> updateExpense({
+    required String expenseId,
+    required double amount,
+    required String category,
+    required String description,
+    String? eventName,
+    String? remarks,
+    required DateTime expenseDate,
+  }) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to edit club expenses.');
+      throw Exception('Network connection required');
+    }
+
+    try {
+      await _client.from('club_expenses').update({
+        'amount': amount,
+        'category': category,
+        'description': description,
+        'event_name': eventName,
+        'remarks': remarks,
+        'expense_date': expenseDate.toIso8601String(),
+      }).eq('id', expenseId);
+    } catch (e) {
+      debugPrint('Error updating club expense: $e');
+      rethrow;
+    }
+  }
+
+  // Delete an expense
+  static Future<void> deleteExpense(String expenseId) async {
+    final isOnline = await ConnectivityService.hasInternet();
+    if (!isOnline) {
+      ConnectivityService.showNoInternetToast(message: 'Internet connection required to delete club expenses.');
+      throw Exception('Network connection required');
+    }
+
+    try {
+      await _client.from('club_expenses').delete().eq('id', expenseId);
+    } catch (e) {
+      debugPrint('Error deleting club expense: $e');
+      rethrow;
+    }
+  }
 }
 
