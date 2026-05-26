@@ -234,12 +234,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 )
                               : null,
                         ),
-                        GestureDetector(
-                          onTap: _pickImage,
-                          child: CircleAvatar(
-                            radius: 22,
-                            backgroundColor: colors.primary,
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        Tooltip(
+                          message: 'Upload Profile Picture',
+                          child: GestureDetector(
+                            onTap: _pickImage,
+                            child: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: colors.primary,
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                            ),
                           ),
                         ),
                       ],
@@ -266,6 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: _inputDecoration('Change Password', Icons.lock).copyWith(
                       suffixIcon: IconButton(
                         icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off),
+                        tooltip: _showPassword ? 'Hide Password' : 'Show Password',
                         onPressed: () => setState(() => _showPassword = !_showPassword),
                       ),
                       hintText: 'Leave empty to keep current',

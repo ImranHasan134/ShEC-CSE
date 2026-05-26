@@ -116,6 +116,7 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
                     isLabelVisible: UpdateService.instance.hasUpdate,
                     child: IconButton(
                       icon: const Icon(Icons.menu),
+                      tooltip: 'Open navigation drawer',
                       onPressed: () => controller.toggle(),
                     ),
                   );
@@ -139,11 +140,14 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
                   builder: (context, profile, _) {
                     return Padding(
                       padding: const EdgeInsets.only(right: 12.0),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-                        },
-                        child: AnimatedProfileIcon(profile: profile, colors: colors),
+                      child: Tooltip(
+                        message: 'View Profile',
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                          },
+                          child: AnimatedProfileIcon(profile: profile, colors: colors),
+                        ),
                       ),
                     );
                   },

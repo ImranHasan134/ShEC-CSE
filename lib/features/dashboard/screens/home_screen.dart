@@ -29,6 +29,8 @@ import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
+  
+  static final GlobalKey quickAccessKey = GlobalKey();
 
   const DashboardScreen({super.key, this.onNavigateToTab});
 
@@ -167,42 +169,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
 
         // --- QUICK ACCESS SECTION ---
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Column(
+          key: DashboardScreen.quickAccessKey,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Quick Access', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            TextButton.icon(
-              onPressed: () => _showEditQuickAccessSheet(context),
-              icon: const Icon(Icons.edit, size: 16),
-              label: const Text('Edit'),
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Quick Access', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Tooltip(
+                  message: 'Customize home screen shortcuts',
+                  child: TextButton.icon(
+                    onPressed: () => _showEditQuickAccessSheet(context),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Edit'),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ValueListenableBuilder<List<ShortcutItem>>(
+              valueListenable: activeShortcuts,
+              builder: (context, shortcuts, _) {
+                if (shortcuts.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.1))),
+                    child: const Center(child: Text('Tap Edit to add shortcuts.')),
+                  );
+                }
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  alignment: WrapAlignment.start,
+                  children: shortcuts.map((shortcut) {
+                    return SizedBox(
+                      width: (MediaQuery.of(context).size.width - 32 - (16 * 3)) / 4,
+                      child: _buildQuickAccessIcon(context, shortcut.icon, shortcut.title, shortcut.color, () => _executeShortcut(context, shortcut.id)),
+                    );
+                  }).toList(),
+                );
+              },
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-
-        ValueListenableBuilder<List<ShortcutItem>>(
-          valueListenable: activeShortcuts,
-          builder: (context, shortcuts, _) {
-            if (shortcuts.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.1))),
-                child: const Center(child: Text('Tap Edit to add shortcuts.')),
-              );
-            }
-            return Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              alignment: WrapAlignment.start,
-              children: shortcuts.map((shortcut) {
-                return SizedBox(
-                  width: (MediaQuery.of(context).size.width - 32 - (16 * 3)) / 4,
-                  child: _buildQuickAccessIcon(context, shortcut.icon, shortcut.title, shortcut.color, () => _executeShortcut(context, shortcut.id)),
-                );
-              }).toList(),
-            );
-          },
         ),
 
         const SizedBox(height: 32),
@@ -399,19 +409,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickAccessIcon(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: color.withOpacity(0.15),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.1)),
-        ],
+    return Tooltip(
+      message: 'Go to $label',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: color.withOpacity(0.15),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 8),
+            Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.1)),
+          ],
+        ),
       ),
     );
   }

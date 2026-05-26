@@ -34,7 +34,12 @@ class _MembersScreenState extends State<MembersScreen> {
   Future<void> _changeRole(ProfileData member, UserRole newRole) async {
     try {
       await AuthService.updateUserRole(member.id, newRole);
-      if (mounted) _showToast('Role updated successfully', isError: false);
+      if (mounted) {
+        _showToast('Role updated successfully', isError: false);
+        if (newRole == UserRole.committeeMember) {
+          _showCommitteePrivilegesDialog(member);
+        }
+      }
       _fetchMembers(); // Refresh list
     } catch (e) {
       if (mounted) _showToast('Error updating role: $e', isError: true);
@@ -214,6 +219,89 @@ class _MembersScreenState extends State<MembersScreen> {
                 );
               },
             ),
+    );
+  }
+
+  void _showCommitteePrivilegesDialog(ProfileData member) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final colors = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.shield_outlined, color: colors.primary),
+              const SizedBox(width: 12),
+              const Text('Committee Privileges', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${member.name} has been promoted to a Committee Member! They now have access to administrative controls across the app. Here are their newly unlocked functional tooltips:',
+                  style: const TextStyle(fontSize: 13, height: 1.3),
+                ),
+                const SizedBox(height: 16),
+                _buildPrivilegeItem(colors, Icons.auto_awesome, 'Notice Board', 'Approve, Pinned/Unpinned, Hide/Show, Edit, and Delete notices.'),
+                _buildPrivilegeItem(colors, Icons.school, 'Faculty Directory', 'Add, Edit, Hide/Show, and Delete teacher contact cards.'),
+                _buildPrivilegeItem(colors, Icons.emoji_events, 'Contest Portal', 'Add, Edit, Hide/Show, and Delete programming contests.'),
+                _buildPrivilegeItem(colors, Icons.people, 'Alumni Directory', 'Add, Edit, Hide/Show, and Delete alumni listings.'),
+                _buildPrivilegeItem(colors, Icons.work_outline, 'Career Board', 'Add, Edit, Hide/Show, and Delete job listings.'),
+                _buildPrivilegeItem(colors, Icons.folder_open, 'Academic Resources', 'Upload, modify, and delete resources or course folders.'),
+                _buildPrivilegeItem(colors, Icons.account_balance, 'Club Accounts', 'Access accounting logs, log income/expenses, and view dues.'),
+              ],
+            ),
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                backgroundColor: colors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPrivilegeItem(ColorScheme colors, IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: colors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: colors.primary, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text(description, style: TextStyle(fontSize: 11, color: colors.onSurface.withOpacity(0.6), height: 1.2)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
