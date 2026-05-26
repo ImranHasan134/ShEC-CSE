@@ -73,6 +73,9 @@ class ImageProcessingService {
         return File(croppedFile.path);
       }
       return null;
+    } catch (e) {
+      debugPrint('ImageProcessingService: cropImage failed, falling back to original. Error: $e');
+      return imageFile; // Fallback to the original uncropped image
     } finally {
       if (isTemporaryCopy) {
         try {
