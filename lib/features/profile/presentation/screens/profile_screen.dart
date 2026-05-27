@@ -63,11 +63,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _checkLostData() async {
-    final ImagePicker picker = ImagePicker();
-    final LostDataResponse response = await picker.retrieveLostData();
-    if (response.isEmpty) return;
-    if (response.file != null) {
-      setState(() => _newImageFile = File(response.file!.path));
+    try {
+      final ImagePicker picker = ImagePicker();
+      final LostDataResponse response = await picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.file != null) {
+        if (!mounted) return;
+        
+        // 1. Crop recovered image (Square ratio for profiles)
+        final cropped = await ImageProcessingService.cropImage(
+          context, 
+          File(response.file!.path),
+          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        );
+        
+        if (cropped != null) {
+          // 2. Compress and Convert to WebP
+          final processed = await ImageProcessingService.processAndConvert(cropped);
+          if (processed != null) {
+            setState(() => _newImageFile = processed);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error retrieving lost image data: $e');
     }
   }
 
