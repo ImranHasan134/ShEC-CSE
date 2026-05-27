@@ -856,7 +856,7 @@ class _ContributorsScreenState extends State<ContributorsScreen> with TickerProv
           _buildRoleCard(
             name: 'Saifur Rahman',
             role: 'SYSTEM ARCHITECTURE & BACKEND',
-            desc: 'Database Design, Backend Pipelines, and Application Core Implementation.',
+            desc: 'Database Design, Backend Pipelines, and Application Implementation.',
             icon: Icons.terminal,
             color: const Color(0xFF00ADB5),
             colors: colors,
@@ -865,7 +865,7 @@ class _ContributorsScreenState extends State<ContributorsScreen> with TickerProv
           _buildRoleCard(
             name: 'Imran Hasan',
             role: 'UI/UX DESIGN & INTERACTION',
-            desc: 'Visual Identity, Motion Prefs, Aesthetics, and Frontend User Experience.',
+            desc: 'Visual Identity, Motion Prefs and Frontend User Experience.',
             icon: Icons.palette_outlined,
             color: const Color(0xFFE53935),
             colors: colors,
@@ -873,8 +873,8 @@ class _ContributorsScreenState extends State<ContributorsScreen> with TickerProv
           const SizedBox(height: 12),
           _buildRoleCard(
             name: 'Alamgir Kabir • Tanvirul Islam',
-            role: 'CONCEPT & PLANNING LEADERSHIP',
-            desc: 'Initial Concept Planning, Feature Mapping, and Architecture Supervision.',
+            role: 'CONCEPT & PLANNING',
+            desc: 'Initial Concept Planning, Feature Mapping.',
             icon: Icons.security,
             color: const Color(0xFFFFB300),
             colors: colors,
@@ -882,8 +882,8 @@ class _ContributorsScreenState extends State<ContributorsScreen> with TickerProv
           const SizedBox(height: 12),
           _buildRoleCard(
             name: 'Tanvirul Islam • Imran Hasan • Alamgir Kabir • Abdul Awal Asif',
-            role: 'STRATEGIC PLANNING SUPPORT',
-            desc: 'Feature Requirements gathering, Strategy Refinement, and Alpha Release Testing.',
+            role: 'PLANNING SUPPORT',
+            desc: 'Feature Requirements gathering, Refinement, and Alpha Release Testing.',
             icon: Icons.hub_outlined,
             color: const Color(0xFF43A047),
             colors: colors,
