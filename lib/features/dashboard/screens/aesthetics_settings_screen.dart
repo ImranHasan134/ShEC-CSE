@@ -28,9 +28,11 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
   late TabController _tabController;
 
   final GlobalKey _previewCardKey = GlobalKey();
+  final GlobalKey _themeModeKey = GlobalKey();
+  final GlobalKey _colorGridKey = GlobalKey();
   final GlobalKey _ambientSwitchKey = GlobalKey();
   final GlobalKey _styleSelectorKey = GlobalKey();
-  final GlobalKey _colorGridKey = GlobalKey();
+  final GlobalKey _canvasElementsKey = GlobalKey();
   final GlobalKey _saveButtonKey = GlobalKey();
   bool _showTour = false;
 
@@ -257,6 +259,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                           children: [
                             // Theme Mode Selection Card
                             _buildGlassCard(
+                              key: _themeModeKey,
                               child: Padding(
                                 padding: const EdgeInsets.all(16.0),
                                 child: Column(
@@ -527,6 +530,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _buildGlassCard(
+                              key: _canvasElementsKey,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -701,38 +705,62 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
         if (_showTour)
           GuidedTourOverlay(
             steps: [
+              // Step 0: Preview Canvas (visible on all tabs)
               TourStep(
                 targetKey: _previewCardKey,
-                title: 'Aesthetics Preview Canvas',
-                description: 'This interactive canvas immediately previews your custom style, color selections, sparkle density, and animation speeds in real-time.',
+                title: '✨ Live Aesthetics Preview',
+                description: 'This is your real-time canvas — every change you make to colors, themes, sparkles, wallpapers, and animations is instantly reflected here before applying globally.',
               ),
+              // Step 1: Theme Mode (Colors tab)
               TourStep(
-                targetKey: _ambientSwitchKey,
-                title: 'Ambient Toggle',
-                description: 'Toggle this switch to turn off the drifting animations completely for a clean look and maximum battery savings.',
+                targetKey: _themeModeKey,
+                title: '🌙 Choose Your Theme Mode',
+                description: 'Pick between System (auto), Light, Dark, or the premium Night mode. Night mode uses a pure black canvas that makes colors pop beautifully on AMOLED screens.',
               ),
-              TourStep(
-                targetKey: _styleSelectorKey,
-                title: 'Drift Styles',
-                description: 'Pick between premium visual engines: Time-based Aurora, cyberpunk grids, starry nebulae, gentle waves, or autumn leaf diamond falls.',
-              ),
+              // Step 2: Color Scheme (Colors tab)
               TourStep(
                 targetKey: _colorGridKey,
-                title: 'Dynamic Palette Seeds',
-                description: 'Select a theme color scheme or seed a vibrant HSL customized color directly from the custom picker wheel.',
+                title: '🎨 Color Palette & Custom Hue',
+                description: 'Select a built-in palette — Teal, Ocean Blue, Cosmic Purple, Emerald, Amber or Crimson. Choose Custom to open a rainbow HSL hue wheel and dial in your perfect accent color.',
               ),
+              // Step 3: Sparkles toggle (Visuals tab)
+              TourStep(
+                targetKey: _ambientSwitchKey,
+                title: '⭐ Twinkling Sparkles',
+                description: 'Toggle floating particle motes that drift across the background. Adjust sparkle density (up to 150 particles) and drift speed from sluggish to blazing fast.',
+              ),
+              // Step 4: Aurora style selector (Visuals tab)
+              TourStep(
+                targetKey: _styleSelectorKey,
+                title: '🌌 Aesthetic Aurora Styles',
+                description: 'In Dark or Night mode, choose your animated aurora engine: time-adaptive Aurora, electric Cyberpunk grids, deep Cosmic nebulae, calming Ocean waves, or warm Autumn leaf falls.',
+              ),
+              // Step 5: Canvas Elements (Canvas tab)
+              TourStep(
+                targetKey: _canvasElementsKey,
+                title: '🖼️ Static Canvas Elements',
+                description: 'Layer crisp vector wallpapers (Starry constellations, Geometric shapes, Waves, Tech Blueprint grid) and geometric patterns over your background. Use the density slider to dial in complexity.',
+              ),
+              // Step 6: Save button
               TourStep(
                 targetKey: _saveButtonKey,
-                title: 'Commit Aesthetics Globally',
-                description: 'Satisfied with your styling adjustments? Tapping Apply immediately saves and deploys your custom configurations globally across the entire app.',
+                title: '💾 Apply Settings Globally',
+                description: 'Once you are happy with your aesthetic configuration, tap Apply to save and instantly propagate your theme, colors, and visual effects across the entire app.',
               ),
             ],
             onStepChanged: (stepIndex) {
+              // Navigate to the correct tab for each step
               if (stepIndex == 1 || stepIndex == 2) {
-                // Switch to Motion/Visuals Tab
+                // Colors tab: Theme Mode & Color Scheme
+                _tabController.animateTo(0);
+              } else if (stepIndex == 3 || stepIndex == 4) {
+                // Visuals tab: Sparkles & Aurora
                 _tabController.animateTo(1);
-              } else if (stepIndex == 3) {
-                // Switch to Colors Tab
+              } else if (stepIndex == 5) {
+                // Canvas tab: Wallpapers & Patterns
+                _tabController.animateTo(2);
+              } else if (stepIndex == 6) {
+                // Back to Colors tab for save button
                 _tabController.animateTo(0);
               }
             },
