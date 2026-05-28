@@ -21,6 +21,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
   late String _localPattern;
   late String _localWallpaper;
   late bool _localWallpaperEnabled;
+  late double _localWallpaperDensity;
   late AppColorTheme _localColorTheme;
   late AppThemeMode _localThemeMode;
   late int _localCustomColorValue;
@@ -50,6 +51,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
     _localPattern = ambientPattern.value;
     _localWallpaper = ambientWallpaper.value;
     _localWallpaperEnabled = ambientWallpaperEnabled.value;
+    _localWallpaperDensity = ambientWallpaperDensity.value;
     _localColorTheme = themeService.colorTheme;
     _localThemeMode = themeService.themeMode;
     _localCustomColorValue = themeService.customColorValue;
@@ -137,6 +139,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
     ambientPattern.value = _localPattern;
     ambientWallpaper.value = _localWallpaper;
     ambientWallpaperEnabled.value = _localWallpaperEnabled;
+    ambientWallpaperDensity.value = _localWallpaperDensity;
 
     // Commit dynamic ThemeService settings (propagates to MaterialApp builder)
     themeService.setThemeMode(_localThemeMode);
@@ -185,6 +188,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
           overrideAuroraEnabled: _localAuroraEnabled,
           overrideWallpaper: _localWallpaper,
           overrideWallpaperEnabled: _localWallpaperEnabled,
+          overrideWallpaperDensity: _localWallpaperDensity,
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -359,6 +363,77 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                             ),
                             const SizedBox(height: 16),
 
+                            // Ambient Sparkle Sliders (Only active if Twinkling Sparkles is on)
+                            AnimatedOpacity(
+                              duration: const Duration(milliseconds: 250),
+                              opacity: _localEnabled ? 1.0 : 0.4,
+                              child: AbsorbPointer(
+                                absorbing: !_localEnabled,
+                                child: _buildGlassCard(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'SPARKLE PREFERENCES',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.2,
+                                            color: previewScheme.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Density Slider
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Sparkle Density', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            Text('$_localDensity particles',
+                                                style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        Slider(
+                                          value: _localDensity.toDouble(),
+                                          min: 10.0,
+                                          max: 150.0,
+                                          divisions: 14,
+                                          activeColor: previewScheme.primary,
+                                          inactiveColor: previewScheme.primary.withOpacity(0.2),
+                                          onChanged: (val) {
+                                            setState(() => _localDensity = val.toInt());
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+                                        // Speed Slider
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Drift Speed', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            Text('${_localSpeed.toStringAsFixed(1)}x',
+                                                style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        Slider(
+                                          value: _localSpeed,
+                                          min: 0.2,
+                                          max: 3.0,
+                                          divisions: 28,
+                                          activeColor: previewScheme.primary,
+                                          inactiveColor: previewScheme.primary.withOpacity(0.2),
+                                          onChanged: (val) {
+                                            setState(() => _localSpeed = val);
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
                             // Aesthetic Mesh Auroras Switch
                             _buildGlassCard(
                               child: SwitchListTile(
@@ -434,77 +509,6 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                                         ),
                                         const SizedBox(height: 16),
                                         _buildStyleSelectionGrid(previewScheme),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-        
-                            // Ambient Sparkle Sliders (Only active if Twinkling Sparkles is on)
-                            AnimatedOpacity(
-                              duration: const Duration(milliseconds: 250),
-                              opacity: _localEnabled ? 1.0 : 0.4,
-                              child: AbsorbPointer(
-                                absorbing: !_localEnabled,
-                                child: _buildGlassCard(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'SPARKLE PREFERENCES',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.2,
-                                            color: previewScheme.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        // Density Slider
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text('Sparkle Density', style: TextStyle(fontWeight: FontWeight.bold)),
-                                            Text('$_localDensity particles',
-                                                style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                        Slider(
-                                          value: _localDensity.toDouble(),
-                                          min: 10.0,
-                                          max: 150.0,
-                                          divisions: 14,
-                                          activeColor: previewScheme.primary,
-                                          inactiveColor: previewScheme.primary.withOpacity(0.2),
-                                          onChanged: (val) {
-                                            setState(() => _localDensity = val.toInt());
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-                                        // Speed Slider
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text('Drift Speed', style: TextStyle(fontWeight: FontWeight.bold)),
-                                            Text('${_localSpeed.toStringAsFixed(1)}x',
-                                                style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                        Slider(
-                                          value: _localSpeed,
-                                          min: 0.2,
-                                          max: 3.0,
-                                          divisions: 28,
-                                          activeColor: previewScheme.primary,
-                                          inactiveColor: previewScheme.primary.withOpacity(0.2),
-                                          onChanged: (val) {
-                                            setState(() => _localSpeed = val);
-                                          },
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -650,6 +654,26 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                                                           );
                                                         }).toList(),
                                                       ),
+                                                    ),
+                                                    const SizedBox(height: 24),
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        const Text('Wallpaper & Pattern Density', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                        Text('${_localWallpaperDensity.toStringAsFixed(1)}x',
+                                                            style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
+                                                      ],
+                                                    ),
+                                                    Slider(
+                                                      value: _localWallpaperDensity,
+                                                      min: 0.5,
+                                                      max: 2.0,
+                                                      divisions: 15,
+                                                      activeColor: previewScheme.primary,
+                                                      inactiveColor: previewScheme.primary.withValues(alpha: 0.2),
+                                                      onChanged: (val) {
+                                                        setState(() => _localWallpaperDensity = val);
+                                                      },
                                                     ),
                                                   ],
                                                 ),

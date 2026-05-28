@@ -12,6 +12,7 @@ final ValueNotifier<String> ambientPattern = ValueNotifier('none'); // Options: 
 final ValueNotifier<bool> ambientAuroraEnabled = ValueNotifier(true); // Toggle on/off for aesthetic dynamic blobs
 final ValueNotifier<String> ambientWallpaper = ValueNotifier('none'); // Options: none, starry, geometric, wave, tech_grid
 final ValueNotifier<bool> ambientWallpaperEnabled = ValueNotifier(true); // Toggle on/off for static wallpaper
+final ValueNotifier<double> ambientWallpaperDensity = ValueNotifier(1.0); // Ranges from 0.5 to 2.0
 
 class AmbientSettings {
   static Future<void> init() async {
@@ -25,6 +26,7 @@ class AmbientSettings {
       ambientAuroraEnabled.value = prefs.getBool('ambient_aurora_enabled') ?? true;
       ambientWallpaper.value = prefs.getString('ambient_wallpaper') ?? 'none';
       ambientWallpaperEnabled.value = prefs.getBool('ambient_wallpaper_enabled') ?? true;
+      ambientWallpaperDensity.value = prefs.getDouble('ambient_wallpaper_density') ?? 1.0;
     } catch (e) {
       debugPrint('Error loading ambient background settings: $e');
     }
@@ -61,6 +63,10 @@ class AmbientSettings {
     ambientWallpaperEnabled.addListener(() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('ambient_wallpaper_enabled', ambientWallpaperEnabled.value);
+    });
+    ambientWallpaperDensity.addListener(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('ambient_wallpaper_density', ambientWallpaperDensity.value);
     });
   }
 }
@@ -113,6 +119,7 @@ class AmbientTimeBackground extends StatefulWidget {
   final bool? overrideAuroraEnabled;
   final String? overrideWallpaper;
   final bool? overrideWallpaperEnabled;
+  final double? overrideWallpaperDensity;
 
   const AmbientTimeBackground({
     super.key,
@@ -127,6 +134,7 @@ class AmbientTimeBackground extends StatefulWidget {
     this.overrideAuroraEnabled,
     this.overrideWallpaper,
     this.overrideWallpaperEnabled,
+    this.overrideWallpaperDensity,
   });
 
   @override
@@ -253,6 +261,7 @@ class _AmbientTimeBackgroundState extends State<AmbientTimeBackground> with Sing
         ambientAuroraEnabled,
         ambientWallpaper,
         ambientWallpaperEnabled,
+        ambientWallpaperDensity,
       ]),
       builder: (context, _) {
         final speedFactor = widget.overrideSpeed ?? ambientAnimationSpeed.value;
@@ -265,6 +274,7 @@ class _AmbientTimeBackgroundState extends State<AmbientTimeBackground> with Sing
         final isWallpaperEnabled = widget.overrideWallpaperEnabled ?? ambientWallpaperEnabled.value;
         final currentWallpaper = isWallpaperEnabled ? (widget.overrideWallpaper ?? ambientWallpaper.value) : 'none';
         final currentPattern = isWallpaperEnabled ? (widget.overridePattern ?? ambientPattern.value) : 'none';
+        final currentWallpaperDensity = widget.overrideWallpaperDensity ?? ambientWallpaperDensity.value;
 
         // Draw flat container only if absolutely nothing is enabled
         if (!isSparklesEnabled && !isAuroraEnabled && currentPattern == 'none' && currentWallpaper == 'none') {
@@ -312,6 +322,7 @@ class _AmbientTimeBackgroundState extends State<AmbientTimeBackground> with Sing
                       isDark: isDark,
                       timePeriod: _timePeriod,
                       showTimeSymbol: isAuroraEnabled,
+                      density: currentWallpaperDensity,
                     ),
                   ),
                 ),
@@ -522,6 +533,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
   final bool isDark;
   final TimePeriod timePeriod;
   final bool showTimeSymbol;
+  final double density;
 
   WallpaperAndPatternPainter({
     required this.colors,
@@ -531,6 +543,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
     required this.isDark,
     required this.timePeriod,
     required this.showTimeSymbol,
+    required this.density,
   });
 
   @override
@@ -569,6 +582,18 @@ class WallpaperAndPatternPainter extends CustomPainter {
         canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.72), 4.5, starPaint);
         canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.78), 3.5, starPaint);
 
+        // EXTRA density starry constellations
+        if (density > 1.2) {
+          canvas.drawLine(Offset(size.width * 0.1, size.height * 0.5), Offset(size.width * 0.3, size.height * 0.48), linePaint);
+          canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.5), 3.0, starPaint);
+          canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.48), 3.5, starPaint);
+        }
+        if (density > 1.6) {
+          canvas.drawLine(Offset(size.width * 0.5, size.height * 0.8), Offset(size.width * 0.7, size.height * 0.82), linePaint);
+          canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.8), 3.0, starPaint);
+          canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.82), 3.5, starPaint);
+        }
+
       } else if (wallpaper == 'geometric') {
         final shapePaint = Paint()
           ..style = PaintingStyle.stroke
@@ -576,16 +601,16 @@ class WallpaperAndPatternPainter extends CustomPainter {
           ..color = (isDark ? colors.color1 : primaryColor).withValues(alpha: isDark ? 0.28 : 0.20);
         
         // Boosted overlapping circles and geometric bounds
-        canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.28), size.width * 0.38, shapePaint);
+        canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.28), size.width * 0.38 * density, shapePaint);
         shapePaint.color = (isDark ? colors.color2 : primaryColor).withValues(alpha: isDark ? 0.24 : 0.18);
-        canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.72), size.width * 0.42, shapePaint);
+        canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.72), size.width * 0.42 * density, shapePaint);
         
         shapePaint.color = (isDark ? colors.color3 : primaryColor).withValues(alpha: isDark ? 0.20 : 0.14);
         final Path diamond = Path()
-          ..moveTo(size.width * 0.5, size.height * 0.22)
-          ..lineTo(size.width * 0.78, size.height * 0.42)
-          ..lineTo(size.width * 0.5, size.height * 0.62)
-          ..lineTo(size.width * 0.22, size.height * 0.42)
+          ..moveTo(size.width * 0.5, size.height * (0.42 - 0.20 * density))
+          ..lineTo(size.width * (0.5 + 0.28 * density), size.height * 0.42)
+          ..lineTo(size.width * 0.5, size.height * (0.42 + 0.20 * density))
+          ..lineTo(size.width * (0.5 - 0.28 * density), size.height * 0.42)
           ..close();
         canvas.drawPath(diamond, shapePaint);
 
@@ -594,14 +619,15 @@ class WallpaperAndPatternPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.5; // Thickened waves
         
-        for (int i = 0; i < 3; i++) {
-          wavePaint.color = (i == 0 
+        final int waveCount = (3 * density).round().clamp(1, 6);
+        for (int i = 0; i < waveCount; i++) {
+          wavePaint.color = (i % 3 == 0 
               ? colors.color1 
-              : i == 1 
+              : i % 3 == 1 
                   ? colors.color2 
                   : colors.color3).withValues(alpha: isDark ? 0.35 : 0.25);
           final Path path = Path();
-          final double startY = size.height * (0.3 + i * 0.22);
+          final double startY = size.height * (0.2 + i * (0.6 / waveCount));
           path.moveTo(0, startY);
           for (double x = 0; x <= size.width; x += 10) {
             final double y = startY + math.sin(x / 45 + i) * 16;
@@ -617,7 +643,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
           ..strokeWidth = 1.2;
 
         // Blueprint Grid
-        const double spacing = 48.0;
+        final double spacing = 48.0 / density;
         for (double x = 0; x < size.width; x += spacing) {
           canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
         }
@@ -632,7 +658,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
         
         for (double x = 0; x < size.width; x += spacing * 2) {
           for (double y = 0; y < size.height; y += spacing * 2) {
-            canvas.drawCircle(Offset(x, y), 3.0, markPaint);
+            canvas.drawCircle(Offset(x, y), 2.5, markPaint);
           }
         }
       }
@@ -646,7 +672,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
 
       if (pattern == 'dots') {
         patternPaint.style = PaintingStyle.fill;
-        const double spacing = 24.0;
+        final double spacing = 24.0 / density;
         for (double x = spacing / 2; x < size.width; x += spacing) {
           for (double y = spacing / 2; y < size.height; y += spacing) {
             canvas.drawCircle(Offset(x, y), 2.0, patternPaint); // Slightly larger dots
@@ -654,7 +680,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
         }
       } else if (pattern == 'grid') {
         patternPaint.strokeWidth = 1.0;
-        const double spacing = 32.0;
+        final double spacing = 32.0 / density;
         for (double x = 0; x < size.width; x += spacing) {
           canvas.drawLine(Offset(x, 0), Offset(x, size.height), patternPaint);
         }
@@ -663,7 +689,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
         }
       } else if (pattern == 'waves') {
         patternPaint.strokeWidth = 1.4;
-        const double spacing = 40.0;
+        final double spacing = 40.0 / density;
         for (double y = spacing; y < size.height; y += spacing) {
           final Path path = Path();
           path.moveTo(0, y);
@@ -674,7 +700,7 @@ class WallpaperAndPatternPainter extends CustomPainter {
         }
       } else if (pattern == 'stripes') {
         patternPaint.strokeWidth = 1.5;
-        const double spacing = 45.0;
+        final double spacing = 45.0 / density;
         for (double i = -size.height; i < size.width; i += spacing) {
           canvas.drawLine(Offset(i, 0), Offset(i + size.height, size.height), patternPaint);
         }
@@ -794,7 +820,8 @@ class WallpaperAndPatternPainter extends CustomPainter {
         oldDelegate.wallpaper != wallpaper ||
         oldDelegate.isDark != isDark ||
         oldDelegate.timePeriod != timePeriod ||
-        oldDelegate.showTimeSymbol != showTimeSymbol;
+        oldDelegate.showTimeSymbol != showTimeSymbol ||
+        oldDelegate.density != density;
   }
 }
 

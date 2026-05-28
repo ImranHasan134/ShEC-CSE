@@ -147,7 +147,7 @@ class ThemeService extends ChangeNotifier {
         ),
         scaffoldBackgroundColor: background,
         appBarTheme: AppBarTheme(
-          backgroundColor: background.withValues(alpha: 0.92),
+          backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
