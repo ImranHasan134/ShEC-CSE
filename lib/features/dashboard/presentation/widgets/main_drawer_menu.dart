@@ -6,7 +6,6 @@ import 'package:ShEC_CSE/features/auth/presentation/bloc/auth_event.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ShEC_CSE/core/services/theme_service.dart';
 import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
-import 'package:ShEC_CSE/core/services/tour_service.dart';
 import 'package:ShEC_CSE/features/department/presentation/screens/department_screen.dart';
 import 'package:ShEC_CSE/features/auth/screens/auth_animated_screen.dart';
 import 'package:ShEC_CSE/backend/services/auth_service.dart';
@@ -26,6 +25,7 @@ import 'package:ShEC_CSE/features/alumni/screens/alumni_screen.dart';
 import 'package:ShEC_CSE/features/accounting/presentation/screens/accounting_dashboard_screen.dart';
 import 'package:ShEC_CSE/features/dashboard/screens/aesthetics_settings_screen.dart';
 import 'package:ShEC_CSE/features/permissions/screens/committee_permissions_screen.dart';
+import 'package:ShEC_CSE/features/dashboard/screens/feedback_screen.dart';
 
 // ─── Custom Premium Interactive Tree Branch Painter ──────────────────────────
 
@@ -901,12 +901,9 @@ class _MainDrawerMenuState extends State<MainDrawerMenu> {
                               _menuItem(
                                 context,
                                 controller,
-                                icon: Icons.map_outlined,
-                                title: 'Guided Screen Tour',
-                                onTap: () async {
-                                  await TourService.instance.resetAllScreenTours();
-                                  TourService.instance.startTour();
-                                },
+                                icon: Icons.rate_review_outlined,
+                                title: 'Send Feedback',
+                                destination: const FeedbackScreen(),
                               ),
                             ],
                           ),
