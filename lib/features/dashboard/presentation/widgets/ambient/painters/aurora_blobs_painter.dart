@@ -40,7 +40,7 @@ class AuroraBlobsPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, paint);
 
     // Use the continuous elapsed time in seconds to ensure perfectly smooth, infinite, non-looping motion
-    final double t = animationValue * speedFactor * 0.15;
+    final double t = animationValue * speedFactor * 0.8;
 
     if (auroraEnabled) {
       if (style == 'cyberpunk') {
