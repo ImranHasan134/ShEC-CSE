@@ -26,6 +26,7 @@ import 'package:ShEC_CSE/features/accounting/presentation/screens/accounting_das
 import 'package:ShEC_CSE/features/dashboard/screens/aesthetics_settings_screen.dart';
 import 'package:ShEC_CSE/features/permissions/screens/committee_permissions_screen.dart';
 import 'package:ShEC_CSE/features/dashboard/screens/feedback_screen.dart';
+import 'package:ShEC_CSE/features/dashboard/screens/feedback_list_screen.dart';
 
 // ─── Custom Premium Interactive Tree Branch Painter ──────────────────────────
 
@@ -898,12 +899,24 @@ class _MainDrawerMenuState extends State<MainDrawerMenu> {
                                 title: 'Themes & Colors',
                                 destination: const AestheticsSettingsScreen(),
                               ),
-                              _menuItem(
-                                context,
-                                controller,
-                                icon: Icons.rate_review_outlined,
-                                title: 'Send Feedback',
-                                destination: const FeedbackScreen(),
+                              ValueListenableBuilder<ProfileData>(
+                                valueListenable: currentProfile,
+                                builder: (context, profile, _) {
+                                  final isCommitteeOrAdmin = profile.role == UserRole.committeeMember ||
+                                      profile.role == UserRole.superUser ||
+                                      profile.designation == 'President' ||
+                                      profile.designation == 'Vice President';
+
+                                  return _menuItem(
+                                    context,
+                                    controller,
+                                    icon: Icons.rate_review_outlined,
+                                    title: 'Feedback',
+                                    destination: isCommitteeOrAdmin
+                                        ? const FeedbackListScreen()
+                                        : const FeedbackScreen(),
+                                  );
+                                },
                               ),
                             ],
                           ),

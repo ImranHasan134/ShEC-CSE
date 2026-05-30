@@ -18,4 +18,16 @@ class FeedbackService {
       'comment': comment,
     });
   }
+
+  static Future<List<Map<String, dynamic>>> getFeedbacks() async {
+    final response = await _client
+        .from('feedbacks')
+        .select('*')
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> deleteFeedback(String id) async {
+    await _client.from('feedbacks').delete().eq('id', id);
+  }
 }
