@@ -1,9 +1,13 @@
-// lib/features/dashboard/screens/aesthetics_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:ShEC_CSE/core/services/theme_service.dart';
 import 'package:ShEC_CSE/core/services/tour_service.dart';
 import 'package:ShEC_CSE/features/dashboard/presentation/widgets/guided_tour_overlay.dart';
+import 'aesthetics/widgets/live_preview_card.dart';
+import 'aesthetics/widgets/aesthetics_dialogs.dart';
+import 'aesthetics/tabs/colors_tab.dart';
+import 'aesthetics/tabs/visuals_tab.dart';
+import 'aesthetics/tabs/canvas_tab.dart';
 
 class AestheticsSettingsScreen extends StatefulWidget {
   const AestheticsSettingsScreen({super.key});
@@ -176,7 +180,6 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
   Widget build(BuildContext context) {
     final currentThemeScheme = Theme.of(context).colorScheme;
     final ColorScheme previewScheme = _getLocalColorScheme();
-    final bool isPreviewLight = previewScheme.brightness == Brightness.light;
 
     return Stack(
       children: [
@@ -205,16 +208,28 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                 // 1. Sticky Real-Time Preview Canvas (Always visible at the top!)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-                  child: _buildLivePreviewCard(previewScheme),
+                  child: LivePreviewCard(
+                    previewCardKey: _previewCardKey,
+                    previewScheme: previewScheme,
+                    localEnabled: _localEnabled,
+                    localSpeed: _localSpeed,
+                    localDensity: _localDensity,
+                    localStyle: _localStyle,
+                    localAuroraEnabled: _localAuroraEnabled,
+                    localPattern: _localPattern,
+                    localWallpaper: _localWallpaper,
+                    localWallpaperEnabled: _localWallpaperEnabled,
+                    getStyleTitle: _getStyleTitle,
+                  ),
                 ),
 
                 // 2. Custom Premium Sliding TabBar
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
                   decoration: BoxDecoration(
-                    color: currentThemeScheme.surfaceContainer.withOpacity(0.4),
+                    color: currentThemeScheme.surfaceContainer.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: currentThemeScheme.outline.withOpacity(0.08)),
+                    border: Border.all(color: currentThemeScheme.outline.withValues(alpha: 0.08)),
                   ),
                   padding: const EdgeInsets.all(4),
                   child: TabBar(
@@ -225,7 +240,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                     ),
                     indicatorSize: TabBarIndicatorSize.tab,
                     labelColor: Colors.white,
-                    unselectedLabelColor: currentThemeScheme.onSurface.withOpacity(0.6),
+                    unselectedLabelColor: currentThemeScheme.onSurface.withValues(alpha: 0.6),
                     labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     dividerColor: Colors.transparent,
                     tabs: const [
@@ -251,446 +266,84 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                     controller: _tabController,
                     children: [
                       // TAB 1: COLORS & MODES
-                      SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Theme Mode Selection Card
-                            _buildGlassCard(
-                              key: _themeModeKey,
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'THEME MODE',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 1.2,
-                                        color: previewScheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        _buildThemeModeItem(AppThemeMode.system, 'System', Icons.brightness_auto, previewScheme),
-                                        const SizedBox(width: 8),
-                                        _buildThemeModeItem(AppThemeMode.light, 'Light', Icons.light_mode, previewScheme),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        _buildThemeModeItem(AppThemeMode.dark, 'Dark', Icons.dark_mode, previewScheme),
-                                        const SizedBox(width: 8),
-                                        _buildThemeModeItem(AppThemeMode.night, 'Night', Icons.nights_stay, previewScheme),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Color Scheme Palette Selection Card
-                            _buildGlassCard(
-                              key: _colorGridKey,
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'COLOR SCHEME',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 1.2,
-                                        color: previewScheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _buildColorGrid(previewScheme),
-                                    
-                                    // Rainbow HSL custom color picker
-                                    if (_localColorTheme == AppColorTheme.custom) ...[
-                                      const Divider(height: 32),
-                                      _buildCustomColorPicker(previewScheme),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      ColorsTab(
+                        themeModeKey: _themeModeKey,
+                        colorGridKey: _colorGridKey,
+                        localThemeMode: _localThemeMode,
+                        localColorTheme: _localColorTheme,
+                        localCustomColorValue: _localCustomColorValue,
+                        hueValue: _hueValue,
+                        previewScheme: previewScheme,
+                        onThemeModeChanged: (val) {
+                          setState(() => _localThemeMode = val);
+                        },
+                        onColorThemeChanged: (val) {
+                          setState(() => _localColorTheme = val);
+                        },
+                        onHueValueChanged: (val) {
+                          setState(() {
+                            _hueValue = val;
+                            _updateCustomColorFromHue();
+                          });
+                        },
+                        onCustomColorSwatchSelected: (colorVal, hueVal) {
+                          setState(() {
+                            _localCustomColorValue = colorVal;
+                            _hueValue = hueVal;
+                          });
+                        },
                       ),
 
                       // TAB 2: ANIMATIONS & SLIDERS
-                      SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Twinkling Sparkles Switch
-                            _buildGlassCard(
-                              key: _ambientSwitchKey,
-                              child: SwitchListTile(
-                                activeColor: previewScheme.primary,
-                                title: Row(
-                                  children: [
-                                    Icon(Icons.star_border, color: previewScheme.primary),
-                                    const SizedBox(width: 12),
-                                    const Text(
-                                      'Twinkling Sparkles',
-                                      style: TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                                subtitle: const Padding(
-                                  padding: EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    'Enable twinkling star sparkles and floating motes. Can be combined with dynamic auroras or custom wallpapers.',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                                value: _localEnabled,
-                                onChanged: (val) {
-                                  setState(() => _localEnabled = val);
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Ambient Sparkle Sliders (Only active if Twinkling Sparkles is on)
-                            AnimatedOpacity(
-                              duration: const Duration(milliseconds: 250),
-                              opacity: _localEnabled ? 1.0 : 0.4,
-                              child: AbsorbPointer(
-                                absorbing: !_localEnabled,
-                                child: _buildGlassCard(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'SPARKLE PREFERENCES',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.2,
-                                            color: previewScheme.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        // Density Slider
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text('Sparkle Density', style: TextStyle(fontWeight: FontWeight.bold)),
-                                            Text('$_localDensity particles',
-                                                style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                        Slider(
-                                          value: _localDensity.toDouble(),
-                                          min: 10.0,
-                                          max: 150.0,
-                                          divisions: 14,
-                                          activeColor: previewScheme.primary,
-                                          inactiveColor: previewScheme.primary.withOpacity(0.2),
-                                          onChanged: (val) {
-                                            setState(() => _localDensity = val.toInt());
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-                                        // Speed Slider
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text('Drift Speed', style: TextStyle(fontWeight: FontWeight.bold)),
-                                            Text('${_localSpeed.toStringAsFixed(1)}x',
-                                                style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                        Slider(
-                                          value: _localSpeed,
-                                          min: 0.2,
-                                          max: 3.0,
-                                          divisions: 28,
-                                          activeColor: previewScheme.primary,
-                                          inactiveColor: previewScheme.primary.withOpacity(0.2),
-                                          onChanged: (val) {
-                                            setState(() => _localSpeed = val);
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Aesthetic Mesh Auroras Switch
-                            _buildGlassCard(
-                              child: SwitchListTile(
-                                activeColor: previewScheme.primary,
-                                title: Row(
-                                  children: [
-                                    Icon(Icons.bubble_chart, color: isPreviewLight ? previewScheme.primary.withValues(alpha: 0.5) : previewScheme.primary),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'Aesthetic Mesh Auroras',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: isPreviewLight ? previewScheme.onSurface.withValues(alpha: 0.5) : null,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    GestureDetector(
-                                      onTap: isPreviewLight ? null : () => _showTimeTableDialog(context, previewScheme),
-                                      child: Icon(
-                                        Icons.info_outline,
-                                        size: 16,
-                                        color: isPreviewLight ? previewScheme.primary.withValues(alpha: 0.5) : previewScheme.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    isPreviewLight
-                                        ? 'Mesh Auroras are turned off in Light Mode to ensure contrast and visual clarity.'
-                                        : 'Enable beautifully drifting background color blobs based on current time. Disabling this displays a flat gradient background or static wallpaper.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isPreviewLight ? previewScheme.onSurfaceVariant.withValues(alpha: 0.6) : null,
-                                    ),
-                                  ),
-                                ),
-                                value: isPreviewLight ? false : _localAuroraEnabled,
-                                onChanged: isPreviewLight
-                                    ? null
-                                    : (val) {
-                                        setState(() => _localAuroraEnabled = val);
-                                      },
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-        
-                            // Aesthetic Styles Selector (Only enabled if Aesthetic Mesh Auroras is active and not in light mode)
-                            AnimatedOpacity(
-                              duration: const Duration(milliseconds: 250),
-                              opacity: _localAuroraEnabled && !isPreviewLight ? 1.0 : 0.4,
-                              child: AbsorbPointer(
-                                absorbing: !_localAuroraEnabled || isPreviewLight,
-                                child: _buildGlassCard(
-                                  key: _styleSelectorKey,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'AESTHETIC AURORA STYLE',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.2,
-                                            color: previewScheme.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        _buildStyleSelectionGrid(previewScheme),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      VisualsTab(
+                        ambientSwitchKey: _ambientSwitchKey,
+                        styleSelectorKey: _styleSelectorKey,
+                        localEnabled: _localEnabled,
+                        localDensity: _localDensity,
+                        localSpeed: _localSpeed,
+                        localAuroraEnabled: _localAuroraEnabled,
+                        localStyle: _localStyle,
+                        previewScheme: previewScheme,
+                        onEnabledChanged: (val) {
+                          setState(() => _localEnabled = val);
+                        },
+                        onDensityChanged: (val) {
+                          setState(() => _localDensity = val);
+                        },
+                        onSpeedChanged: (val) {
+                          setState(() => _localSpeed = val);
+                        },
+                        onAuroraEnabledChanged: (val) {
+                          setState(() => _localAuroraEnabled = val);
+                        },
+                        onStyleChanged: (val) {
+                          setState(() => _localStyle = val);
+                        },
+                        onTimeTableDialogRequested: () {
+                          showTimeTableDialog(context, previewScheme);
+                        },
                       ),
 
                       // TAB 3: WALLPAPERS & PATTERNS
-                      SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildGlassCard(
-                              key: _canvasElementsKey,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  SwitchListTile(
-                                    activeColor: previewScheme.primary,
-                                    title: Row(
-                                      children: [
-                                        Icon(Icons.wallpaper, color: previewScheme.primary),
-                                        const SizedBox(width: 12),
-                                        const Text(
-                                          'Static Canvas Elements',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                    subtitle: const Padding(
-                                      padding: EdgeInsets.only(top: 4.0),
-                                      child: Text(
-                                        'Display beautiful vector wallpapers and geometric patterns. Drawn crisply on top of ambient auroras without any blur.',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                    value: _localWallpaperEnabled,
-                                    onChanged: (val) {
-                                      setState(() => _localWallpaperEnabled = val);
-                                    },
-                                  ),
-                                  AnimatedSize(
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOut,
-                                    child: _localWallpaperEnabled
-                                        ? Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Divider(height: 1),
-                                              Padding(
-                                                padding: const EdgeInsets.all(16.0),
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'STATIC BACKGROUND WALLPAPER',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w800,
-                                                        letterSpacing: 1.2,
-                                                        color: previewScheme.primary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 12),
-                                                    _buildWallpaperGrid(previewScheme),
-                                                    const SizedBox(height: 24),
-                                                    Text(
-                                                      'STATIC BACKGROUND PATTERN',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w800,
-                                                        letterSpacing: 1.2,
-                                                        color: previewScheme.primary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 12),
-                                                    SingleChildScrollView(
-                                                      scrollDirection: Axis.horizontal,
-                                                      physics: const BouncingScrollPhysics(),
-                                                      child: Row(
-                                                        children: [
-                                                          'none',
-                                                          'dots',
-                                                          'grid',
-                                                          'waves',
-                                                          'stripes',
-                                                        ].map((pat) {
-                                                          final isSelected = _localPattern == pat;
-                                                          String label;
-                                                          IconData icon;
-                                                          switch (pat) {
-                                                            case 'none':
-                                                              label = 'None';
-                                                              icon = Icons.blur_off;
-                                                              break;
-                                                            case 'dots':
-                                                              label = 'Dots Grid';
-                                                              icon = Icons.blur_on;
-                                                              break;
-                                                            case 'grid':
-                                                              label = 'Line Grid';
-                                                              icon = Icons.grid_on;
-                                                              break;
-                                                            case 'waves':
-                                                              label = 'Waves';
-                                                              icon = Icons.waves;
-                                                              break;
-                                                            case 'stripes':
-                                                              label = 'Diagonal Stripes';
-                                                              icon = Icons.dehaze;
-                                                              break;
-                                                            default:
-                                                              label = 'None';
-                                                              icon = Icons.blur_off;
-                                                          }
-                                                          return Padding(
-                                                            padding: const EdgeInsets.only(right: 8.0),
-                                                            child: ChoiceChip(
-                                                              label: Row(
-                                                                mainAxisSize: MainAxisSize.min,
-                                                                children: [
-                                                                  Icon(icon, size: 16, color: isSelected ? Colors.white : previewScheme.onSurface),
-                                                                  const SizedBox(width: 6),
-                                                                  Text(label),
-                                                                ],
-                                                              ),
-                                                              selected: isSelected,
-                                                              selectedColor: previewScheme.primary,
-                                                              labelStyle: TextStyle(
-                                                                color: isSelected ? Colors.white : previewScheme.onSurface,
-                                                                fontWeight: FontWeight.bold,
-                                                              ),
-                                                              onSelected: (selected) {
-                                                                if (selected) {
-                                                                  setState(() => _localPattern = pat);
-                                                                }
-                                                              },
-                                                            ),
-                                                          );
-                                                        }).toList(),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 24),
-                                                    Row(
-                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                      children: [
-                                                        const Text('Wallpaper & Pattern Density', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                        Text('${_localWallpaperDensity.toStringAsFixed(1)}x',
-                                                            style: TextStyle(color: previewScheme.primary, fontWeight: FontWeight.bold)),
-                                                      ],
-                                                    ),
-                                                    Slider(
-                                                      value: _localWallpaperDensity,
-                                                      min: 0.5,
-                                                      max: 2.0,
-                                                      divisions: 15,
-                                                      activeColor: previewScheme.primary,
-                                                      inactiveColor: previewScheme.primary.withValues(alpha: 0.2),
-                                                      onChanged: (val) {
-                                                        setState(() => _localWallpaperDensity = val);
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        : const SizedBox.shrink(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      CanvasTab(
+                        canvasElementsKey: _canvasElementsKey,
+                        localWallpaperEnabled: _localWallpaperEnabled,
+                        localWallpaper: _localWallpaper,
+                        localPattern: _localPattern,
+                        localWallpaperDensity: _localWallpaperDensity,
+                        previewScheme: previewScheme,
+                        onWallpaperEnabledChanged: (val) {
+                          setState(() => _localWallpaperEnabled = val);
+                        },
+                        onWallpaperChanged: (val) {
+                          setState(() => _localWallpaper = val);
+                        },
+                        onPatternChanged: (val) {
+                          setState(() => _localPattern = val);
+                        },
+                        onWallpaperDensityChanged: (val) {
+                          setState(() => _localWallpaperDensity = val);
+                        },
                       ),
                     ],
                   ),
@@ -705,43 +358,36 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
         if (_showTour)
           GuidedTourOverlay(
             steps: [
-              // Step 0: Preview Canvas (visible on all tabs)
               TourStep(
                 targetKey: _previewCardKey,
                 title: '✨ Live Aesthetics Preview',
                 description: 'This is your real-time canvas — every change you make to colors, themes, sparkles, wallpapers, and animations is instantly reflected here before applying globally.',
               ),
-              // Step 1: Theme Mode (Colors tab)
               TourStep(
                 targetKey: _themeModeKey,
                 title: '🌙 Choose Your Theme Mode',
                 description: 'Pick between System (auto), Light, Dark, or the premium Night mode. Night mode uses a pure black canvas that makes colors pop beautifully on AMOLED screens.',
               ),
-              // Step 2: Color Scheme (Colors tab)
               TourStep(
                 targetKey: _colorGridKey,
                 title: '🎨 Color Palette & Custom Hue',
                 description: 'Select a built-in palette — Teal, Ocean Blue, Cosmic Purple, Emerald, Amber or Crimson. Choose Custom to open a rainbow HSL hue wheel and dial in your perfect accent color.',
               ),
-              // Step 3: Sparkles toggle (Visuals tab)
               TourStep(
                 targetKey: _ambientSwitchKey,
                 title: '⭐ Twinkling Sparkles',
                 description: 'Toggle floating particle motes that drift across the background. Adjust sparkle density (up to 150 particles) and drift speed from sluggish to blazing fast.',
               ),
-              // Step 4: Aurora style selector (Visuals tab)
               TourStep(
                 targetKey: _styleSelectorKey,
                 title: '🌌 Aesthetic Aurora Styles',
                 description: 'In Dark or Night mode, choose your animated aurora engine: time-adaptive Aurora, electric Cyberpunk grids, deep Cosmic nebulae, calming Ocean waves, or warm Autumn leaf falls.',
               ),
-              // Step 5: Canvas Elements (Canvas tab)
               TourStep(
                 targetKey: _canvasElementsKey,
                 title: '🖼️ Static Canvas Elements',
                 description: 'Layer crisp vector wallpapers (Starry constellations, Geometric shapes, Waves, Tech Blueprint grid) and geometric patterns over your background. Use the density slider to dial in complexity.',
               ),
-              // Step 6: Save button
               TourStep(
                 targetKey: _saveButtonKey,
                 title: '💾 Apply Settings Globally',
@@ -749,18 +395,13 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
               ),
             ],
             onStepChanged: (stepIndex) {
-              // Navigate to the correct tab for each step
               if (stepIndex == 1 || stepIndex == 2) {
-                // Colors tab: Theme Mode & Color Scheme
                 _tabController.animateTo(0);
               } else if (stepIndex == 3 || stepIndex == 4) {
-                // Visuals tab: Sparkles & Aurora
                 _tabController.animateTo(1);
               } else if (stepIndex == 5) {
-                // Canvas tab: Wallpapers & Patterns
                 _tabController.animateTo(2);
               } else if (stepIndex == 6) {
-                // Back to Colors tab for save button
                 _tabController.animateTo(0);
               }
             },
@@ -777,708 +418,15 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
     );
   }
 
-  Widget _buildGlassCard({Key? key, required Widget child}) {
-    final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Card(
-      key: key,
-      elevation: isDark ? 0 : 2, // Slight elevation in light mode to make it pop!
-      color: isDark ? colors.surfaceContainer.withOpacity(0.7) : Colors.white, // Solid opaque white in light mode to boost contrast
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: colors.outline.withOpacity(isDark ? 0.1 : 0.2)),
-      ),
-      child: child,
-    );
-  }
-
-  void _showTimeTableDialog(BuildContext context, ColorScheme previewScheme) {
-    final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: isDark ? colors.surface : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              Icon(Icons.access_time_filled, color: previewScheme.primary, size: 24),
-              const SizedBox(width: 12),
-              const Text(
-                'Aesthetic Time Table',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'The background color scheme dynamically adapts to these time periods to create a soothing, ambient aesthetic.',
-                  style: TextStyle(fontSize: 12.5),
-                ),
-                const SizedBox(height: 20),
-                _buildTimeTableItem(
-                  title: 'Morning (5:00 AM - 12:00 PM)',
-                  label: 'Sunrise Golden Amber & Warm Peach',
-                  icons: [Icons.wb_twilight, Icons.wb_sunny_outlined],
-                  dotColors: [previewScheme.primary, const Color(0xFFFF9100), const Color(0xFFFFD600)],
-                  previewScheme: previewScheme,
-                ),
-                const SizedBox(height: 14),
-                _buildTimeTableItem(
-                  title: 'Afternoon (12:00 PM - 5:00 PM)',
-                  label: 'High-energy Sky Cyan & Emerald',
-                  icons: [Icons.wb_sunny, Icons.light_mode],
-                  dotColors: [previewScheme.primary, const Color(0xFF00E5FF), const Color(0xFF00E676)],
-                  previewScheme: previewScheme,
-                ),
-                const SizedBox(height: 14),
-                _buildTimeTableItem(
-                  title: 'Evening (5:00 PM - 9:00 PM)',
-                  label: 'Twilight Crimson Sunset & Magenta',
-                  icons: [Icons.wb_twilight_sharp, Icons.nights_stay_outlined],
-                  dotColors: [previewScheme.primary, const Color(0xFFFF1744), const Color(0xFFD500F9)],
-                  previewScheme: previewScheme,
-                ),
-                const SizedBox(height: 14),
-                _buildTimeTableItem(
-                  title: 'Night (9:00 PM - 5:00 AM)',
-                  label: 'Deep Cosmic Indigo & Midnight Blue',
-                  icons: [Icons.nights_stay, Icons.bedtime],
-                  dotColors: [previewScheme.primary, const Color(0xFF2979FF), const Color(0xFF651FFF)],
-                  previewScheme: previewScheme,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              style: TextButton.styleFrom(
-                foregroundColor: previewScheme.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              ),
-              child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildTimeTableItem({
-    required String title,
-    required String label,
-    required List<IconData> icons,
-    required List<Color> dotColors,
-    required ColorScheme previewScheme,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? colors.surfaceContainer.withOpacity(0.4) : colors.surfaceContainer.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outline.withOpacity(0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icons[0], size: 16, color: previewScheme.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant.withOpacity(0.85)),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: dotColors.map((dotColor) {
-              return Container(
-                margin: const EdgeInsets.only(right: 6),
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: dotColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: dotColor.withOpacity(0.4),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    )
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLivePreviewCard(ColorScheme previewScheme) {
-    return Container(
-      key: _previewCardKey,
-      height: 150,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: previewScheme.primary.withOpacity(0.15),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          )
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          // Decoupled preview background - loads local override parameters in real-time
-          Positioned.fill(
-            child: AmbientTimeBackground(
-              overrideEnabled: _localEnabled,
-              overrideSpeed: _localSpeed,
-              overrideDensity: _localDensity,
-              overrideStyle: _localStyle,
-              overrideColorScheme: previewScheme,
-              overridePattern: _localPattern,
-              overrideAuroraEnabled: _localAuroraEnabled,
-              overrideWallpaper: _localWallpaper,
-              overrideWallpaperEnabled: _localWallpaperEnabled,
-              child: const SizedBox.expand(),
-            ),
-          ),
-
-          // High-end glassmorphic information card overlay
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: previewScheme.surfaceContainer.withOpacity(0.8),
-                child: Row(
-                  children: [
-                    Icon(
-                      _localEnabled || _localAuroraEnabled ? Icons.auto_awesome : Icons.do_not_disturb_on,
-                      color: _localEnabled || _localAuroraEnabled ? previewScheme.primary : Colors.grey,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _localEnabled || _localAuroraEnabled
-                                ? 'Live Preview Canvas'
-                                : 'Background Disabled',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: previewScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _localEnabled || _localAuroraEnabled
-                                ? 'Style: ${_getStyleTitle(_localStyle)} • Wallpaper: ${_localWallpaper}'
-                                : 'Saving performance with flat base colors.',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: previewScheme.onSurfaceVariant.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: previewScheme.primary.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'PREVIEW',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: previewScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Premium overlay border to ensure it never gets obscured by active custom painter canvas under BackdropFilter
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: previewScheme.primary.withOpacity(0.6),
-                    width: 2.5,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWallpaperGrid(ColorScheme previewScheme) {
-    final wallpapersList = [
-      {'id': 'none', 'title': 'None', 'desc': 'Standard time aurora sky', 'icon': Icons.blur_off},
-      {'id': 'starry', 'title': 'Starry Sky', 'desc': 'Cosmic void and constellations', 'icon': Icons.star_border},
-      {'id': 'geometric', 'title': 'Geometric', 'desc': 'Overlapping polygonal circles', 'icon': Icons.category},
-      {'id': 'wave', 'title': 'Neon Wave', 'desc': 'Layered glowing curves', 'icon': Icons.waves},
-      {'id': 'tech_grid', 'title': 'Matrix Grid', 'desc': 'Futuristic tech wireframe blueprints', 'icon': Icons.grid_goldenratio},
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1.8,
-      ),
-      itemCount: wallpapersList.length,
-      itemBuilder: (context, index) {
-        final wp = wallpapersList[index];
-        final isSelected = _localWallpaper == wp['id'];
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _localWallpaper = wp['id'] as String;
-            });
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: isSelected ? previewScheme.primary.withValues(alpha: 0.08) : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isSelected ? previewScheme.primary : previewScheme.outline.withValues(alpha: 0.1),
-                width: isSelected ? 2.0 : 1.0,
-              ),
-            ),
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  wp['icon'] as IconData,
-                  color: isSelected ? previewScheme.primary : previewScheme.onSurface.withValues(alpha: 0.7),
-                  size: 20,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  wp['title'] as String,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: isSelected ? previewScheme.primary : previewScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  wp['desc'] as String,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: previewScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStyleSelectionGrid(ColorScheme previewScheme) {
-    final stylesList = [
-      {'id': 'aurora', 'title': 'Time Aurora', 'desc': 'Time-based gradients & rising sparkles', 'icon': Icons.auto_awesome},
-      {'id': 'cyberpunk', 'title': 'Cyber Neon', 'desc': 'Digital code grids & horizontal tracks', 'icon': Icons.terminal},
-      {'id': 'cosmic', 'title': 'Cosmic Space', 'desc': 'Deep purple nebula & expanding stars', 'icon': Icons.brightness_3},
-      {'id': 'ocean', 'title': 'Ocean Calm', 'desc': 'Soothing wavy teals & floating bubble rings', 'icon': Icons.water},
-      {'id': 'autumn', 'title': 'Autumn Leaf', 'desc': 'Warm copper forest & falling leaf diamonds', 'icon': Icons.nature},
-    ];
-
-    return Column(
-      children: stylesList.map((st) {
-        final isSelected = _localStyle == st['id'];
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _localStyle = st['id'] as String;
-            });
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8.0),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected ? previewScheme.primary.withOpacity(0.08) : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isSelected ? previewScheme.primary : previewScheme.outline.withOpacity(0.1),
-                width: isSelected ? 2.0 : 1.0,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  st['icon'] as IconData,
-                  color: isSelected ? previewScheme.primary : previewScheme.onSurface.withOpacity(0.6),
-                  size: 24,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        st['title'] as String,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: isSelected ? previewScheme.primary : previewScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        st['desc'] as String,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: previewScheme.onSurfaceVariant.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isSelected)
-                  Icon(Icons.check_circle, color: previewScheme.primary, size: 20),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildColorGrid(ColorScheme previewScheme) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 2.1,
-      ),
-      itemCount: AppColorTheme.values.length,
-      itemBuilder: (context, index) {
-        final colorTheme = AppColorTheme.values[index];
-        final isSelected = _localColorTheme == colorTheme;
-
-        Color primaryVal;
-        String title;
-        switch (colorTheme) {
-          case AppColorTheme.teal:
-            primaryVal = const Color(0xFF00ADB5);
-            title = 'Teal';
-            break;
-          case AppColorTheme.blue:
-            primaryVal = const Color(0xFF1E88E5);
-            title = 'Ocean Blue';
-            break;
-          case AppColorTheme.purple:
-            primaryVal = const Color(0xFF8E24AA);
-            title = 'Cosmic';
-            break;
-          case AppColorTheme.green:
-            primaryVal = const Color(0xFF43A047);
-            title = 'Emerald';
-            break;
-          case AppColorTheme.amber:
-            primaryVal = const Color(0xFFFFB300);
-            title = 'Amber';
-            break;
-          case AppColorTheme.crimson:
-            primaryVal = const Color(0xFFE53935);
-            title = 'Crimson';
-            break;
-          case AppColorTheme.custom:
-            primaryVal = Color(_localCustomColorValue);
-            title = 'Custom';
-            break;
-        }
-
-        return InkWell(
-          onTap: () {
-            setState(() {
-              _localColorTheme = colorTheme;
-            });
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: primaryVal.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? primaryVal : previewScheme.outline.withOpacity(0.1),
-                width: isSelected ? 2.0 : 1.0,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (colorTheme == AppColorTheme.custom)
-                  // Sleek rainbow custom indicator
-                  Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                      gradient: const SweepGradient(
-                        colors: [Colors.red, Colors.yellow, Colors.green, Colors.blue, Colors.purple, Colors.red],
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: primaryVal,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? primaryVal : previewScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCustomColorPicker(ColorScheme previewScheme) {
-    // Custom presets list inside picker card
-    final customSwatches = [
-      {'color': const Color(0xFFFFC107), 'hue': 45.0},  // Vibrant Gold
-      {'color': const Color(0xFFFF007F), 'hue': 330.0}, // Electric Pink
-      {'color': const Color(0xFF39FF14), 'hue': 111.0}, // Neon Green
-      {'color': const Color(0xFF00E5FF), 'hue': 187.0}, // Sky Blue
-      {'color': const Color(0xFFD783FF), 'hue': 280.0}, // Cosmic Lavender
-      {'color': const Color(0xFFFF5722), 'hue': 14.0},  // Fire Orange
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.palette, size: 16),
-            SizedBox(width: 8),
-            Text(
-              'CUSTOM RAINBOW PICKER',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // HSL rainbow gradient track representing Hue
-        Container(
-          height: 16,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            gradient: const LinearGradient(
-              colors: [
-                Colors.red,
-                Colors.orange,
-                Colors.yellow,
-                Colors.green,
-                Colors.blue,
-                Colors.indigo,
-                Colors.purple,
-                Colors.red,
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              )
-            ],
-          ),
-        ),
-
-        // Hue Slider overlay
-        Slider(
-          value: _hueValue,
-          min: 0.0,
-          max: 360.0,
-          activeColor: Color(_localCustomColorValue),
-          inactiveColor: Colors.transparent,
-          onChanged: (val) {
-            setState(() {
-              _hueValue = val;
-              _updateCustomColorFromHue();
-            });
-          },
-        ),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Hue Angle', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-            Text('${_hueValue.toStringAsFixed(0)}°',
-                style: TextStyle(color: Color(_localCustomColorValue), fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        const Text('Quick Swatches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        
-        // Horizontal preset swatches selection row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: customSwatches.map((sw) {
-            final swatchColor = sw['color'] as Color;
-            final isSelected = Color(_localCustomColorValue).value == swatchColor.value ||
-                               (_hueValue - (sw['hue'] as double)).abs() < 5.0;
-
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _hueValue = sw['hue'] as double;
-                  _localCustomColorValue = swatchColor.value;
-                });
-              },
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: swatchColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? previewScheme.onSurface : Colors.transparent,
-                    width: 2.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: swatchColor.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    )
-                  ],
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 18)
-                    : null,
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildThemeModeItem(AppThemeMode mode, String label, IconData icon, ColorScheme previewScheme) {
-    final isSelected = _localThemeMode == mode;
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _localThemeMode = mode;
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? previewScheme.primary : previewScheme.surfaceContainer.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? previewScheme.primary : previewScheme.outline.withOpacity(0.08),
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isSelected ? Colors.white : previewScheme.onSurface.withOpacity(0.7),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : previewScheme.onSurface.withOpacity(0.8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomActionBar(ColorScheme currentScheme, ColorScheme previewScheme) {
     return Container(
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
         color: currentScheme.surface,
-        border: Border(top: BorderSide(color: currentScheme.outline.withOpacity(0.08))),
+        border: Border(top: BorderSide(color: currentScheme.outline.withValues(alpha: 0.08))),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, -3),
           )
@@ -1498,7 +446,7 @@ class _AestheticsSettingsScreenState extends State<AestheticsSettingsScreen> wit
                 child: Text(
                   'Cancel',
                   style: TextStyle(
-                    color: currentScheme.onSurface.withOpacity(0.6),
+                    color: currentScheme.onSurface.withValues(alpha: 0.6),
                     fontWeight: FontWeight.bold,
                   ),
                 ),

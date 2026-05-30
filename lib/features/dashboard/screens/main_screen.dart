@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hidden_drawer_menu/hidden_drawer_menu.dart';
-import 'package:google_nav_bar/google_nav_bar.dart';
-import 'package:ShEC_CSE/features/profile/models/profile_state.dart';
 import 'package:ShEC_CSE/features/dashboard/screens/home_screen.dart';
 import 'package:ShEC_CSE/backend/services/update_service.dart';
 import 'package:ShEC_CSE/features/notices/screens/notices_screen.dart';
@@ -13,11 +11,12 @@ import 'package:ShEC_CSE/backend/services/notice_service.dart';
 import 'package:ShEC_CSE/backend/services/job_service.dart';
 import 'package:ShEC_CSE/backend/services/contest_service.dart';
 import 'package:ShEC_CSE/backend/services/chat_service.dart';
-import 'package:ShEC_CSE/features/dashboard/presentation/widgets/animated_profile_icon.dart';
 import 'package:ShEC_CSE/features/dashboard/presentation/widgets/main_drawer_menu.dart';
 import 'package:ShEC_CSE/features/dashboard/presentation/widgets/ambient_background.dart';
 import 'package:ShEC_CSE/core/services/tour_service.dart';
-import 'package:ShEC_CSE/features/dashboard/presentation/widgets/guided_tour_overlay.dart';
+import 'main/widgets/main_navigation_bar.dart';
+import 'main/widgets/main_app_bar.dart';
+import 'main/widgets/onboarding_tour.dart';
 
 class HomeLayout extends StatefulWidget {
   const HomeLayout({super.key});
@@ -151,211 +150,55 @@ class _HomeLayoutState extends State<HomeLayout> with WidgetsBindingObserver {
               children: [
                 Scaffold(
                   backgroundColor: Colors.transparent,
-                  appBar: AppBar(
-                    elevation: 0,
-                    leading: ListenableBuilder(
-                      listenable: UpdateService.instance,
-                      builder: (context, _) {
-                        return Badge(
-                          isLabelVisible: UpdateService.instance.hasUpdate,
-                          child: IconButton(
-                            key: _drawerKey,
-                            icon: const Icon(Icons.menu),
-                            tooltip: 'Open navigation drawer',
-                            onPressed: () => controller.toggle(),
-                          ),
-                        );
-                      },
-                    ),
-                    title: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset('assets/branding/logo.png', height: 28, width: 28),
-                        const SizedBox(width: 12),
-                        Text(
-                          _currentIndex == 0 ? 'ShEC CSE' : _getAppBarTitle(_currentIndex),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    centerTitle: true,
-                    actions: [
-                      ValueListenableBuilder<ProfileData>(
-                        valueListenable: currentProfile,
-                        builder: (context, profile, _) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: Tooltip(
-                              message: 'View Profile',
-                              child: GestureDetector(
-                                key: _profileKey,
-                                onTap: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-                                },
-                                child: AnimatedProfileIcon(profile: profile, colors: colors),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
+                  appBar: MainAppBar(
+                    currentIndex: _currentIndex,
+                    onMenuPressed: () => controller.toggle(),
+                    onProfilePressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                    },
+                    colors: colors,
+                    drawerKey: _drawerKey,
+                    profileKey: _profileKey,
+                    title: _currentIndex == 0 ? 'ShEC CSE' : _getAppBarTitle(_currentIndex),
                   ),
                   body: IndexedStack(
                     index: _currentIndex,
                     children: _screens,
                   ),
-                  bottomNavigationBar: Container(
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, -2),
-                        )
-                      ],
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        child: ValueListenableBuilder<Map<String, int>>(
-                          valueListenable: NotificationService.unreadCounts,
-                          builder: (context, unread, _) {
-                            return GNav(
-                              rippleColor: colors.primary.withValues(alpha: 0.1),
-                              hoverColor: colors.primary.withValues(alpha: 0.05),
-                              gap: 8,
-                              activeColor: colors.primary,
-                              iconSize: 22,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              duration: const Duration(milliseconds: 300),
-                              tabBackgroundColor: colors.primary.withValues(alpha: 0.1),
-                              color: colors.onSurface.withValues(alpha: 0.6),
-                              tabs: [
-                                const GButton(
-                                  icon: Icons.home,
-                                  text: 'Home',
-                                ),
-                                GButton(
-                                  key: _noticesTabKey,
-                                  icon: Icons.notifications,
-                                  text: 'Notices',
-                                  leading: Badge(
-                                    label: unread['notices']! > 0 ? Text('${unread['notices']}') : null,
-                                    isLabelVisible: unread['notices']! > 0,
-                                    child: Icon(
-                                      Icons.notifications,
-                                      color: _currentIndex == 1 ? colors.primary : colors.onSurface.withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                ),
-                                GButton(
-                                  key: _messengerTabKey,
-                                  icon: Icons.message,
-                                  text: 'Messenger',
-                                  leading: Badge(
-                                    label: unread['messenger']! > 0 ? Text('${unread['messenger']}') : null,
-                                    isLabelVisible: unread['messenger']! > 0,
-                                    child: Icon(
-                                      Icons.message,
-                                      color: _currentIndex == 2 ? colors.primary : colors.onSurface.withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                ),
-                                GButton(
-                                  key: _contestsTabKey,
-                                  icon: Icons.emoji_events,
-                                  text: 'Contests',
-                                  leading: Badge(
-                                    label: unread['contests']! > 0 ? Text('${unread['contests']}') : null,
-                                    isLabelVisible: unread['contests']! > 0,
-                                    child: Icon(
-                                      Icons.emoji_events,
-                                      color: _currentIndex == 3 ? colors.primary : colors.onSurface.withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              selectedIndex: _currentIndex,
-                              onTabChange: (index) {
-                                setState(() => _currentIndex = index);
-                                if (index == 1) NotificationService.clearUnread('notices');
-                                if (index == 2) NotificationService.clearUnread('messenger');
-                                if (index == 3) NotificationService.clearUnread('contests');
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                  bottomNavigationBar: MainNavigationBar(
+                    currentIndex: _currentIndex,
+                    onTabChange: (index) {
+                      setState(() => _currentIndex = index);
+                      if (index == 1) NotificationService.clearUnread('notices');
+                      if (index == 2) NotificationService.clearUnread('messenger');
+                      if (index == 3) NotificationService.clearUnread('contests');
+                    },
+                    colors: colors,
+                    noticesTabKey: _noticesTabKey,
+                    messengerTabKey: _messengerTabKey,
+                    contestsTabKey: _contestsTabKey,
                   ),
                 ),
 
                 // Interactive Guided Onboarding Spotlight Tour Overlay
-                ValueListenableBuilder<bool>(
-                  valueListenable: TourService.instance.isTourActive,
-                  builder: (context, isActive, _) {
-                    if (!isActive) return const SizedBox.shrink();
-                    return GuidedTourOverlay(
-                      steps: [
-                        TourStep(
-                          targetKey: _drawerKey,
-                          title: 'Navigation Menu',
-                          description: 'Tap this icon to open the navigation drawer. Access settings, aesthetics settings, members directories, accounting, and more!',
-                        ),
-                        TourStep(
-                          targetKey: _profileKey,
-                          title: 'Your Profile',
-                          description: 'Tap your profile picture to edit personal details, reset passwords, or review academic information.',
-                        ),
-                        TourStep(
-                          targetKey: DashboardScreen.quickAccessKey,
-                          title: 'Quick Access Panel',
-                          description: 'Instantly hop to Notices, Messenger, Careers, CGPA Calculator, or programming club events here! You can customize these shortcuts to your liking.',
-                        ),
-                        TourStep(
-                          targetKey: _noticesTabKey,
-                          title: 'Notice Board',
-                          description: 'Access the Departmental and Club Notice Boards. Committee members can publish new notices, pin announcements, and toggle visibility right here.',
-                        ),
-                        TourStep(
-                          targetKey: _messengerTabKey,
-                          title: 'CSE Messenger',
-                          description: 'Engage in real-time academic and club group conversations. Chat across the General group, Problem Solving forum, or Committee-only channels.',
-                        ),
-                        TourStep(
-                          targetKey: _contestsTabKey,
-                          title: 'Contest Arena',
-                          description: 'Check ongoing and upcoming programming contests across multiple platforms and explore curated academic courses.',
-                        ),
-                      ],
-                      onStepChanged: (stepIndex) {
-                        setState(() {
-                          if (stepIndex <= 2) {
-                            _currentIndex = 0;
-                          } else if (stepIndex == 3) {
-                            _currentIndex = 1;
-                          } else if (stepIndex == 4) {
-                            _currentIndex = 2;
-                          } else if (stepIndex == 5) {
-                            _currentIndex = 3;
-                          }
-                        });
-                      },
-                      onComplete: () {
-                        TourService.instance.completeTour();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('🎉 Onboarding completed successfully! Enjoy the app!'),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
-                      },
-                      onSkip: () {
-                        TourService.instance.completeTour();
-                      },
-                    );
+                OnboardingTour(
+                  drawerKey: _drawerKey,
+                  profileKey: _profileKey,
+                  noticesTabKey: _noticesTabKey,
+                  messengerTabKey: _messengerTabKey,
+                  contestsTabKey: _contestsTabKey,
+                  onStepChanged: (stepIndex) {
+                    setState(() {
+                      if (stepIndex <= 2) {
+                        _currentIndex = 0;
+                      } else if (stepIndex == 3) {
+                        _currentIndex = 1;
+                      } else if (stepIndex == 4) {
+                        _currentIndex = 2;
+                      } else if (stepIndex == 5) {
+                        _currentIndex = 3;
+                      }
+                    });
                   },
                 ),
               ],
